@@ -1,0 +1,56 @@
+name: Bug Report
+description: Report a bug in AetherWeaver
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the form below.
+  - type: input
+    id: dota-version
+    attributes:
+      label: Dota 2 Version
+      description: What version of Dota 2 are you using? (e.g., 7.36, 7.37)
+      placeholder: "7.37"
+    validations:
+      required: true
+  - type: input
+    id: addon-version
+    attributes:
+      label: Addon Version/Commit
+      description: Which commit or version of AetherWeaver?
+      placeholder: "e.g., commit abc1234"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Clear steps to reproduce the bug
+      placeholder: |
+        1. Launch Dota 2 custom lobby with cheats
+        2. Enable AetherWeaver addon
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens? Include any console errors.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console Logs
+      description: Paste any relevant console output
+      render: shell
