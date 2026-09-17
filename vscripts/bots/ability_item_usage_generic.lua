@@ -1,3 +1,2 @@
--- Generic ability/item usage stub
--- Required by framework
+-- Stub required by the framework
 return {}
