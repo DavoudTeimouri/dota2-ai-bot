@@ -1,5 +1,5 @@
 name="Dota2 AI Bot"
 title="Dota2 AI Bot"
-description="A smart Dota 2 bot that plays like a pro, communicates via chat, and works as a team worker. No external dependencies."
+description="A smart Dota 2 bot for Workshop. Replace init.lua with your logic."
 tags="dota2,ai,bot"
-content_logo="logo.png"
+content_logo=""

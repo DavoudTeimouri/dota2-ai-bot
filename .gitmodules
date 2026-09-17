@@ -1,6 +1,0 @@
-[submodule "framework"]
-	path = framework
-	url = https://github.com/ellakk/5v5dota2ai-framework
-[submodule "addon"]
-	path = addon
-	url = https://github.com/ellakk/5v5dota2ai-addon

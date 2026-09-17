@@ -1,34 +1,23 @@
 # Dota2 AI Bot Workshop Addon
 
-This is a pure Lua bot for Dota 2 that can be published to the Steam Workshop.
-No external dependencies, Python, or executables required. Just subscribe to the
-addon in Dota 2 and enable it in a custom lobby.
-
-## How to Use
-
-1. Subscribe to the Workshop addon (once published).
-2. Create a custom lobby in Dota 2 Beta.
-3. Enable the addon in the lobby settings.
-4. Launch the game; the bot will auto-join and pick a hero.
+This is a minimal Dota 2 bot addon for the Steam Workshop.
+It contains only the required files to be published and run in a custom lobby.
+Replace `vscripts/bots/init.lua` with your own bot logic.
 
 ## Files
-
 - `addoninfo.txt` – Workshop metadata.
-- `vscripts/bots/ability_item_usage_generic.lua` – required stub.
-- `vscripts/bots/init.lua` – bot entry point (you can replace with your own logic).
+- `vscripts/bots/init.lua` – entry point for the bot (create this file with your Lua code).
 
-## Publishing to Workshop
+## How to Publish
+1. Use the Steam Workshop tools (or `steamcmd`) to upload this folder.
+2. Set title, description, visibility.
+3. After publishing, share the Workshop URL.
 
-1. Use the Steam Workshop tools (or `steamcmd`) to upload the folder.
-2. Set the title, description, and visibility.
-3. After publishing, share the Workshop URL with others.
-
-## Customizing the Bot
-
-Edit `vscripts/bots/init.lua` to change hero selection, laning, item builds,
-ability usage, and chat messages. The file is plain Lua and uses the Dota 2
-Scripting API.
+## How to Use in Dota 2
+1. Subscribe to the Workshop addon.
+2. Create a custom lobby in Dota 2 Beta.
+3. Enable the addon in the lobby settings.
+4. Launch the game; the bot will run `init.lua`.
 
 ## License
-
 MIT
