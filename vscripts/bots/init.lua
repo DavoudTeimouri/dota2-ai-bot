@@ -5,6 +5,11 @@
 local AetherWeaver = {}
 
 -- ============================================================================
+-- LOAD GAME INTELLIGENCE MODULE
+-- ============================================================================
+local GameIntelligence = require("game_intelligence")
+
+-- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)
 -- ============================================================================
 local AetherWeaverMessages = {}
@@ -443,7 +448,7 @@ function AetherWeaverMessages.get_weighted(category, weights)
 end
 
 -- ============================================================================
--- BOT CONFIGURATION
+-- BOT STATE
 -- ============================================================================
 local MSG_COOLDOWN = 8.0
 local lastMsg = 0
@@ -487,22 +492,23 @@ local function GetHumanRoles()
     return roles
 end
 
--- Pick hero after human picks
+-- Pick hero after human picks (using GameIntelligence)
 local function PickHeroAfterHumans()
-    local roleHeroes = {
-        carry = {"npc_dota_hero_antimage", "npc_dota_hero_juggernaut", "npc_dota_hero_phantom_assassin", "npc_dota_hero_spectre"},
-        mid = {"npc_dota_hero_invoker", "npc_dota_hero_storm_spirit", "npc_dota_hero_templar_assassin", "npc_dota_hero_puck"},
-        offlane = {"npc_dota_hero_centaur", "npc_dota_hero_tidehunter", "npc_dota_hero_dragon_knight", "npc_dota_hero_axe"},
-        support = {"npc_dota_hero_crystal_maiden", "npc_dota_hero_lich", "npc_dota_hero_witch_doctor", "npc_dota_hero_shadow_shaman"}
-    }
-    local roles = GetHumanRoles()
-    local needed = {}
-    for role, _ in pairs(roleHeroes) do
-        if not roles[role] then table.insert(needed, role) end
+    local humanRoles = GetHumanRoles()
+    local enemyPicks = {}
+    local bannedHeroes = {}
+    
+    -- Collect enemy picks (simplified)
+    for i = 0, 9 do
+        if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= DOTA_TEAM_GOODGUYS then
+            local hero = PlayerResource:GetSelectedHeroEntity(i)
+            if hero and not hero:IsNull() then
+                table.insert(enemyPicks, hero:GetUnitName())
+            end
+        end
     end
-    if #needed == 0 then needed = {"carry", "mid", "offlane", "support"} end
-    local role = needed[math.random(#needed)]
-    local heroName = roleHeroes[role][math.random(#roleHeroes[role])]
+    
+    local heroName = GameIntelligence.PickBan:GetBestPick(humanRoles, enemyPicks, bannedHeroes)
     Say("-pick " .. heroName)
     return heroName
 end
@@ -574,6 +580,104 @@ function AetherWeaver:BotThink()
             if msg then MaybeSay(msg) end
             return 60.0
         end)
+        
+        -- Game intelligence: periodic decision making
+        Timers:CreateTimer(1.0, function()
+            if self.hero and not self.hero:IsNull() then
+                self:MakeGameDecisions()
+            end
+            return 1.0
+        end)
+    end
+end
+
+-- Main decision making loop using GameIntelligence
+function AetherWeaver:MakeGameDecisions()
+    local bot = self.hero
+    local gameTime = GameRules:GetGameTime()
+    
+    -- Update lane assignment
+    local newLane = GameIntelligence.LaneChanging:EvaluateLaneChange(bot, gameTime)
+    if newLane and newLane ~= bot:GetAssignedLane() then
+        bot:SetAssignedLane(newLane)
+        MaybeSay("Switching to " .. newLane .. " lane.")
+    end
+    
+    -- Get farm target
+    local farmTarget = GameIntelligence.Farming:GetBestFarmTarget(bot, gameTime)
+    if farmTarget then
+        bot:AttackTarget(farmTarget)
+    end
+    
+    -- Support actions
+    if bot:GetRole() == "support" then
+        local wardAction = GameIntelligence.Support:GetNextWardAction(bot, gameTime)
+        if wardAction then
+            MaybeSay("Placing ward at " .. wardAction.desc)
+            -- Place ward logic here
+        end
+        
+        local pullAction = GameIntelligence.Support:GetPullAction(bot, gameTime)
+        if pullAction then
+            MaybeSay("Pulling the wave!")
+            -- Pull logic here
+        end
+        
+        local stackAction = GameIntelligence.Support:GetStackAction(bot, gameTime)
+        if stackAction then
+            MaybeSay("Stacking camp!")
+            -- Stack logic here
+        end
+        
+        local smokeAction = GameIntelligence.Support:GetSmokeGankAction(bot, gameTime)
+        if smokeAction then
+            MaybeSay("Smoke ganking " .. smokeAction .. " lane!")
+            -- Smoke gank logic here
+        end
+    end
+    
+    -- Ganking
+    if GameIntelligence.Ganking:ShouldGank(bot, gameTime) then
+        local target = GameIntelligence.Ganking:GetGankTarget(bot)
+        if target then
+            MaybeSay("Ganking " .. target:GetUnitName() .. "!")
+            -- Gank logic here
+        end
+    end
+    
+    -- Pushing
+    if GameIntelligence.Pushing:ShouldPush(bot, gameTime) then
+        local pushLane = GameIntelligence.Pushing:GetPushLane(bot)
+        if pushLane then
+            MaybeSay("Pushing " .. pushLane .. " lane!")
+            -- Push logic here
+        end
+    end
+    
+    -- Team fight logic
+    local enemies = bot:GetNearbyEnemyHeroes(1200)
+    if #enemies > 0 then
+        local target = GameIntelligence.TeamFight:FindBestTarget(bot, enemies)
+        if target then
+            local position = GameIntelligence.TeamFight:GetBestPosition(bot, target)
+            bot:MoveToPosition(position)
+            
+            local abilities = GameIntelligence.TeamFight:GetAbilityUsage(bot, target)
+            for _, abil in ipairs(abilities) do
+                if abil:IsFullyCastable() then
+                    bot:CastAbilityOnTarget(target, abil)
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Human guidance
+    if math.random() < 0.001 then -- 0.1% chance per tick
+        local situation = "early_game"
+        if gameTime > 1800 then situation = "late_game"
+        elseif gameTime > 600 then situation = "mid_game" end
+        GameIntelligence.Guidance:SendTipToHumans(bot, situation)
     end
 end
 
