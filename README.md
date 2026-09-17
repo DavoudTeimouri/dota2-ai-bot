@@ -1,5 +1,8 @@
 # Dota2 Pro Bot
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.7+](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
+
 A smart Dota 2 bot that plays like TI professionals, communicates via chat wheel and messages, hints to human players, and works as a team worker.
 
 ## Features
@@ -18,49 +21,82 @@ A smart Dota 2 bot that plays like TI professionals, communicates via chat wheel
 - Hint system for human teammates
 - Teamwork-focused behavior
 
+## Quick Start
+
+| Step | Command |
+|------|---------|
+| 1. Clone repo (with submodules) | `git clone --recurse-submodules https://github.com/DavoudTeimouri/dota2-ai-bot.git` |
+| 2. Run setup | `chmod +x setup.sh && ./setup.sh` |
+| 3. Activate venv | `source venv/bin/activate` (Linux/macOS) <br> `venv\Scripts\activate` (Windows) |
+| 4. Edit settings | Copy `framework/settings.py.example` to `framework/settings.py` and adjust if needed |
+| 5. Launch Dota 2 Beta | Create a cheat-enabled lobby, launch the game |
+| 6. Run the bot | `python framework.py` |
+
 ## Prerequisites
 - Dota 2 Workshop Tools DLC
 - Dota 2 Beta (via Steam)
 - Python 3.7+
 
-## Setup
-1. Clone the framework and addon:
-   ```bash
-   git clone https://github.com/ellakk/5v5dota2ai-framework
-   git clone https://github.com/ellakk/5v5dota2ai-addon
-   ```
+## Setup Details
+1. **Clone the repository** (this will also clone the required framework and addon as submodules).
+2. **Run the setup script** (`setup.sh`). It will:
+   - Initialize submodules (framework and addon)
+   - Create a Python virtual environment
+   - Install required Python packages
+   - Copy the addon files to your Dota 2 directory (under `dota2_bot`)
+   - Copy the bot script to the framework
+   - Provide an example `settings.py`
+3. **Configure the bot** by editing `framework/settings.py` (see example below).
+4. **Launch a custom game** in Dota 2 Beta with cheats enabled, sv_cheats 1.
+5. **Run the bot** from the repository root: `python framework.py`.
 
-2. Copy the addon files to your Dota 2 beta game directory:
-   ```
-   <SteamLibrary>/steamapps/common/dota 2 beta/game/dota_addons/
-   ```
+## File Layout
+```
+dota2-ai-bot/
+├── framework/           # 5v5dota2ai-framework (submodule)
+│   ├── bots/            # Place your bot Python files here
+│   └── settings.py      # Bot configuration (create from example)
+├── addon/               # 5v5dota2ai-addon (submodule)
+│   └── ...              # Files to be copied to Dota 2 addon folder
+├── vscripts/
+│   └── bots/
+│       └── ability_item_usage_generic.lua  # Lua stub required by framework
+├── setup.sh             # Automated setup script
+├── requirements.txt     # Additional Python requirements
+└── README.md
+```
 
-3. Place the Lua scripts from `vscripts/` into:
-   ```
-   <SteamLibrary>/steamapps/common/dota 2 beta/game/dota_addons/your_addon_name/vscripts/
-   ```
+## Example settings.py
+Create `framework/settings.py` with the following content:
+```python
+# Bot configuration
+bot_filename = "ProBot.py"
+bot_classname = "ProBot"
 
-4. Place the Python bot file (`bots/ProBot.py`) into the framework's `bots/` directory.
+# Optional: adjust how often statistics are collected (seconds)
+statistics_collection = 30.0
 
-5. Edit `settings.py` in the addon to set:
-   - `bot_filename = "ProBot.py"`
-   - `bot_classname = "ProBot"`
-
-6. Launch a custom game with cheats enabled and run:
-   ```bash
-   python framework.py
-   ```
+# Enable debug prints
+debug = False
+```
 
 ## Usage
-- The bot will auto-join and select a hero.
-- Use chat wheel commands via the bot's chat messages.
-- Bot sends hints and funny messages to aid human teammates.
-- Configure behavior in `ProBot.py` (item builds, skill picks, communication triggers).
+- The bot will auto-join and select a hero in the lobby.
+- It sends periodic chat messages (e.g., greetings, hints) to aid teammates.
+- Customize behavior by editing `framework/bots/ProBot.py` (item builds, skill picks, communication triggers).
 
 ## Sharing
-- Upload this repository to GitHub.
-- Users can clone, follow setup steps, and run the bot in their own Dota 2 custom games.
+- Upload this repository to GitHub (already done at https://github.com/DavoudTeimouri/dota2-ai-bot).
+- Users can clone with submodules, run `setup.sh`, and follow the steps above.
 - Ensure each user has their own Workshop Tools and Python environment.
+
+## Troubleshooting
+- **ModuleNotFoundError**: Make sure the virtual environment is activated and dependencies are installed.
+- **Lua script errors**: Verify the Lua files are correctly placed in `<SteamPath>/game/dota_addons/dota2_bot/vscripts/bots/`.
+- **Bot not joining**: Check that `settings.py` points to the correct bot filename and class, and that the lobby has cheats enabled.
 
 ## License
 MIT
+
+## Contributing
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.

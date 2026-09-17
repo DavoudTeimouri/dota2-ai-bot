@@ -1,0 +1,9 @@
+# Core dependencies for the bot framework
+# The 5v5dota2ai-framework may have its own requirements; this is for additional utilities if needed.
+# Example: requests for HTTP communication, numpy for numerical operations, etc.
+requests
+numpy
+# Optional ML dependencies (uncomment if using)
+# torch
+# tensorflow
+# stable-baselines3
