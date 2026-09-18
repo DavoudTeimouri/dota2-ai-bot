@@ -65,38 +65,6 @@ dota2-ai-bot/
 5. Set visibility to **Public** or **Friends Only**
 6. Click **Upload**
 
-## How to Use in Dota 2 (Local Test – No Workshop Needed)
-You can test the bot locally without uploading to the Workshop:
-1. **Clone or download** this repository
-2. Locate your Steam library folder (default: `C:\Program Files (x86)\Steam\steamapps\` or a custom library path)
-3. Ensure you have opted into the Dota 2 Beta:
-   - Steam → Library → right‑click **Dota 2** → Properties → **Betas** tab → select the beta update (usually “beta”)
-4. Copy the `aetherweaver` folder (the repository root) to:
-   ```
-   <SteamLibrary>\steamapps\common\dota 2 beta\game\dota_addons\aetherweaver\
-   ```
-   The folder must contain exactly the files listed above (no extra files/folders).
-5. Launch **Dota 2 Beta**
-6. **Play → Create Lobby**
-   - Game Mode: *All Pick* (or any you like)
-   - **Enable Cheats** – tick this box
-   - (The “Addons” checkbox may be missing in some UI versions; the game still loads addons from the folder)
-7. Click **Start Lobby**, then **Launch Game**
-8. Open the console (back‑tick key `` ` ``) and look for lines like:
-   ```
-   [AetherWeaver] Activating...
-   [AetherWeaver] Initialized
-   [AetherWeaver] I will play npc_dota_hero_antimage in the safe lane.
-   ```
-9. Test orders in **all‑chat** (press Enter, type command, hit Enter):
-   - `!push mid` → Bot replies “Pushing mid lane!” and moves toward the mid lane
-   - `!roshan` → “Let's go Roshan!” → groups toward the Rosh pit
-   - `!ward` → “Warding suggested.” → attempts to place wards
-   - `!lane top` → “Setting lane top” → switches assigned lane
-10. If you see Lua errors in the console, edit the corresponding `.lua` file, save it, then type `dota_reload_scripts` in the console (or restart the lobby) to reload the scripts.
-11. When everything works, the bot will farm, pull/stack camps at :15‑:17/:45‑:47/:53‑:55, place wards on rune spots (even minutes), attempt smoke ganks, join team fights, and respond to your orders.
-12. Share the `aetherweaver` folder with others—they can copy it into their own `...\dota 2 beta\game\dota_addons\` folder and use it in a cheat‑enabled local lobby—**no Steam Workshop upload required**.
-
 ## Chat Commands
 | Command | Description |
 |---------|-------------|
@@ -117,11 +85,6 @@ Edit hero‑specific overrides under `vscripts/bots/Customize/hero/<hero_name>/`
 ## Requirements
 - Dota 2 with Workshop Tools DLC
 - Dota 2 Beta (for custom lobbies with addons)
-
-## Related Topics
-- [Agency Agents](https://hermes-agent.nousresearch.com/docs/skills/agency-agents) – used to consult specialists for this project
-- [Game Designer specialist](https://hermes-agent.nousresearch.com/docs/skills/game-designer) – provided core mechanics and balancing advice
-- [Technical Writer specialist](https://hermes-agent.nousresearch.com/docs/skills/technical-writer) – helped author this README
 
 ## License
 MIT — see [LICENSE](LICENSE) for details.
