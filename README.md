@@ -9,14 +9,14 @@ A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messag
 
 ## Features
 
-- **Hero Selection**: Waits for human picks, then fills missing role and counters enemy lineup
+- **Hero Selection**: Waits for human picks, then fills missing role and counters enemy lineup. Attribute-based pools: Pos1=Agility (carry), Pos2=Intelligence (mid), Pos3=Strength (offlane/tank), Pos4/5=Intelligence (supports). Sequential pick/ban with counter-pick logic.
 - **Lane Assignment**: Assigns lane based on hero role (carry→safe, mid→mid, offlaner→offlane, support→jungle/rune)
 - **Phased Strategies**: Early farm/deny → mid-game gank & tower pressure → late-game Roshan & team fights
 - **Teamwork**: Shares vision hints, calls missing enemies, coordinates smoke ganks, buys courier upgrades, pulls/stacks jungle, heals/shields allies
-- **Team Fight**: Prioritizes targets (squishy > disable > carry), uses ability combos, positions safely, initiates/disengages as needed
+- **Team Fight**: Prioritizes targets (squishy > disable > carry), uses ability combos, positions safely, initiates/disengages as needed. **Smart ultimate usage** with hero-specific logic (initiation, defensive, burst, transformation, global ults).
 - **Supporting**: Buys wards, smoke, dust; pulls creep, stacks jungle; uses heal/shield items/abilities on allies
-- **Communicating & Guiding**: Sends contextual, funny, weighted chat messages and chat-wheel hints
-- **Accept Human Orders**: Parses `!push <lane>`, `!roshan`, `!ward`, `!lane <lane>` in all-chat and executes requested action
+- **Communicating & Guiding**: Sends contextual, funny, weighted chat messages and **chat-wheel hints** (tactical: "Retreat!", "Ult ready.", "Ganking!", "Push now", etc.)
+- **Accept Human Orders**: Parses `!push <lane>`, `!roshan`, `!ward`, `!lane <lane>`, `!gank` in all-chat and executes requested action
 - **Chat Wheels & Sprays**: Custom wheel slots for frequent hints; spray triggers on first blood, tower kill, Roshan kill
 - **Hero Override System**: Customize hero behavior via `Customize/hero/` directory
 - **Lane Priority**: Dynamic lane assignment based on game state and hero suitability
@@ -26,18 +26,21 @@ A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messag
 - **Vision Control**: Strategic ward placement and dewarding for map control
 - **Behavioral Variance**: Introduces randomized behavior to avoid predictability
 - **Enhanced Item and Ability Usage**: Hero-override support in `item_purchase_generic.lua` and `ability_item_usage_generic.lua`
-- **Human-like Bot Names**: English + Persian names for Radiant and Dire
+- **Human-like Bot Names**: English only, 80+ names per team
 - **Per-Hero Skill/Item Builds**: 128+ heroes supported via BotLib with Customize/hero overrides
 - **Patch 7.41f Integration**: Automatic item cost/stat adjustments, hero nerf/buff playstyle adaptations
 - **High-Voted Guide Integration**: Pre-cached STRATZ/Dotabuff meta builds per role (Pos 1-5)
+- **Rune Control**: Assignment system prevents multiple bots contesting same rune; power/bounty/wisdom types distributed by role
+- **Courier Intelligence**: Supports share Tango with human allies; cores ask human supports for Tango/Clarity; Lotus Orb usage on debuffed allies
+- **Aggressive Human Targeting**: Bots prioritize human players for ganks (+40 score) and human cores (+25 extra); coordinated team ganks via `human_gank` desire
 
 ## Bot Names
 
-Bots use human-like names in English and Persian (transliterated):
+Bots use human-like English names:
 
-**Radiant**: Alex, Jordan, Taylor, Morgan, Casey, Riley, Avery, Quinn, Blake, Drew, Peyton, Reese, Rowan, Sage, Skyler, Dakota, River, Phoenix, Nova, Orion, Atlas, Juno, Kai, Zion, Aria, Dara, Nika, Sina, Tara, Yara, Kian, Mina, Arash, Baran, Donya, Eli, Fara, Giti, Hana, Iliya, Jahan, Kaveh, Laleh, Mehr, Nava, Omid, Pari, Raha, Saba, Taha, Vana, Yas, Ziba, Amin, Bahar, Cyrus, Dana, Ehsan, Farhad, Golnar, Homa, Iman, Jasmin, Kamran, Leila, Mahsa, Nader, Parisa, Ramin, Sahar, Tina
+**Radiant**: Alex, Jordan, Taylor, Morgan, Casey, Riley, Avery, Quinn, Blake, Drew, Peyton, Reese, Rowan, Sage, Skyler, Dakota, River, Phoenix, Nova, Orion, Atlas, Juno, Kai, Zion, Sam, Charlie, Finley, Harper, Jesse, Kendall, Lennon, Marley, Noel, Oakley, Presley, Quincy, Remington, Sawyer, Tatum, Winter, Amari, Bowie, Cleo, Dallas, Ellis, Finnegan, Gray, Haven, Indigo, Jude, Koa, Lux, Marlowe, Navy, Onyx, Arden, Bailey, Cameron, Devon, Emery, Frankie, Gale, Hayden, Inari, Journey, Kirby, Larkin, Micah, Nico, Ocean, Parker, Quill, Remy, Shiloh, Tristan, Umbra, Vesper, Wynn, Xander, Yael, Zephyr
 
-**Dire**: Sam, Charlie, Finley, Harper, Jesse, Kendall, Lennon, Marley, Noel, Oakley, Presley, Quincy, Remington, Sawyer, Tatum, Winter, Zion, Amari, Bowie, Cleo, Dallas, Ellis, Finnegan, Gray, Haven, Indigo, Jude, Koa, Lux, Marlowe, Navy, Onyx, Amin, Bahar, Cyrus, Dana, Ehsan, Farhad, Golnar, Homa, Iman, Jasmin, Kamran, Leila, Mahsa, Nader, Omid, Parisa, Ramin, Sahar, Tina, Vida, Yasmin, Zahra, Arman, Bita, Caspian, Donya, Elham, Farzad, Ghazal, Hana, Iraj, Javad, Kourosh, Laleh, Maziar, Narges, Omid, Pedram, Roya, Soroush
+**Dire**: Sam, Charlie, Finley, Harper, Jesse, Kendall, Lennon, Marley, Noel, Oakley, Presley, Quincy, Remington, Sawyer, Tatum, Winter, Zion, Amari, Bowie, Cleo, Dallas, Ellis, Finnegan, Gray, Haven, Indigo, Jude, Koa, Lux, Marlowe, Navy, Onyx, Arden, Bailey, Cameron, Devon, Emery, Frankie, Gale, Hayden, Inari, Journey, Kirby, Larkin, Micah, Nico, Ocean, Parker, Quill, Remy, Shiloh, Tristan, Umbra, Vesper, Wynn, Xander, Yael, Zephyr, Atlas, Juno, Kai, Nova, Orion, Phoenix, River, Sage, Rowan, Reese, Peyton, Drew, Blake, Quinn, Avery, Riley, Casey, Morgan, Taylor, Jordan, Alex
 
 ## Files
 
@@ -69,17 +72,19 @@ dota2-ai-bot/
         │       ├── antimage.lua
         │       ├── crystal_maiden.lua
         │       └── ...
-        ├── ability_item_usage_generic.lua   # Ability + item usage with hero override + patch adjustments
-        ├── bot_names.lua                   # Human-like bot names (EN + FA)
-        ├── courier_generic.lua
-        ├── game_intelligence.lua           # Core game intelligence modules
+        ├── ability_item_usage_generic.lua   # Ability + item usage with hero override + patch adjustments + smart ult usage
+        ├── bot_names.lua                   # Human-like bot names (English only)
+        ├── courier_generic.lua             # Courier + Tango sharing + support requests + Lotus Orb
+        ├── game_intelligence.lua           # Core game intelligence modules + team desire coordination
         ├── game_intelligence_extended.lua  # Extended features (blink dodge, vision, etc.)
         ├── guide_integration.lua           # High-voted guide builds per role (STRATZ/Dotabuff)
-        ├── init.lua                        # Main entry point
+        ├── hero_selection.lua              # Sequential pick/ban with attribute-based pools
+        ├── init.lua                        # Main entry point + chat wheel + human orders
         ├── item_purchase_generic.lua       # Item purchasing with guide/BotLib/customize fallback + patch costs
         ├── patch_741f.lua                  # Patch 7.41f item/hero adjustments
-        ├── rune_generic.lua                # Rune control logic
-        └── skill_build_generic.lua         # Skill leveling with guide/BotLib/customize fallback
+        ├── rune_generic.lua                # Rune control with assignment system (power/bounty/wisdom)
+        ├── skill_build_generic.lua         # Skill leveling with guide/BotLib/customize fallback
+        └── team_desires.lua                # Team coordination desires (push/defend/roshan/teamfight/smoke/ward/human_gank)
 ```
 
 ## How to Use in Dota 2
@@ -107,6 +112,7 @@ To test the bot without uploading to Steam Workshop:
 | `!roshan` | Request Roshan attempt |
 | `!ward` | Request ward placement |
 | `!lane <lane>` | Override bot's lane assignment |
+| `!gank` | Trigger coordinated gank on human players |
 
 ## Patch 7.41f Integration
 
@@ -204,19 +210,21 @@ Edit `vscripts/bots/init.lua` to change:
 
 ## Architecture
 
-- **init.lua**: Main bot think loop, initializes all subsystems
+- **init.lua**: Main bot think loop, initializes all subsystems, chat wheel, human orders
 - **BotLib/**: 128+ per-hero builds (skills, items, ability logic)
 - **Customize/hero/**: User overrides (takes priority over BotLib)
 - **guide_integration.lua**: Pre-cached STRATZ/Dotabuff builds per role (Pos 1-5)
 - **patch_741f.lua**: Patch 7.41f item cost/stat changes, hero playstyle adjustments
-- **game_intelligence.lua**: Pick/ban, lanes, farming, support, teamfight, gank, push, guidance
+- **game_intelligence.lua**: Pick/ban, lanes, farming, support, teamfight, gank, push, guidance, team desire coordination
 - **game_intelligence_extended.lua**: Creep equilibrium, lane priority, adaptive items, teamfight positioning, communication pings, offline RL, blink dodge, economy sharing, vision control, behavioral variance
 - **item_purchase_generic.lua**: Loads build from Guide → Customize → BotLib → generic fallback; uses patch-adjusted costs
-- **ability_item_usage_generic.lua**: Loads ability logic from Customize → BotLib → generic fallback; applies patch adjustments
+- **ability_item_usage_generic.lua**: Loads ability logic from Customize → BotLib → generic fallback; applies patch adjustments; **smart ultimate usage**
 - **skill_build_generic.lua**: Loads skill build from Guide → Customize → BotLib → generic fallback
-- **courier_generic.lua**: Courier upgrade + delivery
-- **rune_generic.lua**: Rune control (bounty, power runes)
-- **bot_names.lua**: 100+ human-like names (English + Persian)
+- **courier_generic.lua**: Courier upgrade + delivery + **Tango sharing + support requests + Lotus Orb**
+- **rune_generic.lua**: Rune control with **assignment system** (bounty, power, wisdom runes)
+- **hero_selection.lua**: **Sequential pick/ban with attribute-based pools** (Pos1=Agi, Pos2=Int, Pos3=Str, Pos4/5=Int)
+- **team_desires.lua**: Team coordination desires (push/defend/roshan/teamfight/smoke/ward/**human_gank**)
+- **bot_names.lua**: 80+ human-like names per team (English only)
 
 ## Requirements
 
