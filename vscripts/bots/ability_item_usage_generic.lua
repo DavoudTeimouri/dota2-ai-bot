@@ -1,22 +1,13 @@
--- Ability usage logic with hero override support
-local M = {}
-
-local function LoadHeroOverride(heroName)
-    local overridePath = string.format("Customize/hero/%s/ability.lua", string.lower(heroName))
-    local status, override = pcall(require, overridePath)
-    if status and override then
-        return override
-    end
+-- Ability usage think function (engine hook)
+function AbilityUsageThink()
     return nil
 end
 
+-- Ability usage module for internal use
+local M = {}
+
 function M.GetAbilityUsage(bot)
-    local heroName = bot:GetUnitName()
-    local override = LoadHeroOverride(heroName)
-    if override and override.AbilityUsage then
-        return override.AbilityUsage(bot)
-    end
-    -- Fallback: do nothing
+    -- Placeholder: to be implemented with hero override
     return nil
 end
 

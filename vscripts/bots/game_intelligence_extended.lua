@@ -3,6 +3,22 @@
 
 local GameIntelligenceExtended = {}
 
+-- Helper: deep copy for tables with only primitive values (strings, numbers, subtables)
+local function deepcopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        setmetatable(copy, deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, nil
+        copy = orig
+    end
+    return copy
+end
+
 -- ============================================================================
 -- 1. IMPROVE LAST-HIT: PREDICT CREEP EQUILIBRIUM DYNAMICALLY
 -- ============================================================================
@@ -13,14 +29,14 @@ function GameIntelligenceExtended:PredictCreepEquilibrium(bot, lane)
     -- This is a simplified version
     local laneCreeps = bot:GetNearbyLaneCreeps(1500, true) -- enemy creeps
     local alliedCreeps = bot:GetNearbyLaneCreeps(1500, false) -- allied creeps
-    
+
     if #laneCreeps == 0 and #alliedCreeps == 0 then
         return nil
     end
-    
+
     -- Calculate average position of enemy and allied creeps
-    local enemyAvgPos = Vector(0,0)
-    local alliedAvgPos = Vector(0,0)
+    local enemyAvgPos = Vector(0,0,0)
+    local alliedAvgPos = Vector(0,0,0)
     for _, creep in ipairs(laneCreeps) do
         enemyAvgPos = enemyAvgPos + creep:GetAbsOrigin()
     end
@@ -33,7 +49,7 @@ function GameIntelligenceExtended:PredictCreepEquilibrium(bot, lane)
     if #alliedCreeps > 0 then
         alliedAvgPos = alliedAvgPos / #alliedCreeps
     end
-    
+
     -- Predict where the wave will meet (simplified: midpoint)
     local predictedPos = (enemyAvgPos + alliedAvgPos) / 2
     -- Convert to distance from tower (we would need the tower position)
@@ -48,28 +64,28 @@ function GameIntelligenceExtended:GetLanePriority(bot, lane, enemyHeroInLane)
     local priority = 0
     local heroName = bot:GetUnitName()
     local enemyName = enemyHeroInLane and enemyHeroInLane:GetUnitName() or nil
-    
+
     -- Base priority from role
+    local role = self:GetHeroRole(heroName)
     local rolePriority = {carry = 3, mid = 2, offlane = 1, support = 0}
-    local role = bot:GetRole() -- We assume bot has GetRole method
     priority = priority + (rolePriority[role] or 0) * 10
-    
+
     -- Hero matchup advantage
     if enemyName then
         local matchupScore = self:GetHeroMatchupScore(heroName, enemyName)
         priority = priority + matchupScore
     end
-    
+
     -- Missing enemies in lane increase priority (safe to farm)
     if not enemyHeroInLane then
         priority = priority + 15 -- safer to farm if enemy missing
     end
-    
+
     -- Enemy presence decreases priority
     if enemyHeroInLane then
         priority = priority - 10
     end
-    
+
     return priority
 end
 
@@ -110,8 +126,10 @@ GameIntelligenceExtended.ItemBuilds = {
         mid = {"item_wraith_band", "item_power_treads", "item_oblivion_staff", "item_ultimate_orb"},
         late = {"item_sheepstick", "item_black_king_bar", "item_shivas_guard", "item_bloodstone", "item_overwhelming_blink"},
     },
-    -- ... other roles
+    -- ... other roles (we'll keep only carry and mid for now; others can be added later)
 }
+GameIntelligenceExtended.ItemBuilds.offlane = deepcopy(GameIntelligenceExtended.ItemBuilds.carry)
+GameIntelligenceExtended.ItemBuilds.support = deepcopy(GameIntelligenceExtended.ItemBuilds.carry)
 
 -- Counter-pick adjustments
 GameIntelligenceExtended.ItemCounters = {
@@ -126,15 +144,15 @@ GameIntelligenceExtended.ItemCounters = {
 }
 
 function GameIntelligenceExtended:GetAdaptiveItemBuild(bot, enemyTeam)
-    local role = bot:GetRole()
+    local role = self:GetHeroRole(bot:GetUnitName())
     local build = deepcopy(self.ItemBuilds[role].early) -- start with early
-    
+
     -- Analyze enemy team composition
     local enemyMagic = 0
     local enemyPhysical = 0
     local enemyDisables = 0
     local enemyHealing = 0
-    
+
     for i = 0, 9 do
         if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= bot:GetTeam() then
             local hero = PlayerResource:GetSelectedHeroEntity(i)
@@ -156,7 +174,7 @@ function GameIntelligenceExtended:GetAdaptiveItemBuild(bot, enemyTeam)
             end
         end
     end
-    
+
     -- Adjust build based on enemy composition
     if enemyMagic > 2 then
         table.insert(build, self.ItemCounters.magic_damage[1]) -- BKB
@@ -170,7 +188,7 @@ function GameIntelligenceExtended:GetAdaptiveItemBuild(bot, enemyTeam)
     if enemyHealing > 0 then
         table.insert(build, self.ItemCounters.healing[1]) -- Grimoire
     end
-    
+
     return build
 end
 
@@ -180,7 +198,7 @@ end
 function GameIntelligenceExtended:EvaluateTeamfightThreat(bot, enemies, allies)
     local threatScore = 0
     local safeZones = {}
-    
+
     -- Evaluate enemy threats
     for _, enemy in ipairs(enemies) do
         if enemy:IsHero() and enemy:IsAlive() and not enemy:IsIllusion() then
@@ -204,10 +222,10 @@ function GameIntelligenceExtended:EvaluateTeamfightThreat(bot, enemies, allies)
             threatScore = threatScore + threat
         end
     end
-    
+
     -- Calculate safe zones (behind allies, near towers, etc.)
     safeZones = self:GetSafeRetreatZones(bot, allies)
-    
+
     return threatScore, safeZones
 end
 
@@ -241,18 +259,17 @@ end
 -- ============================================================================
 function GameIntelligenceExtended:ShouldPingMissingEnemy(bot, gameTime)
     -- Ping if enemy has been missing for a while and we are in danger
-    local missingTime = bot:GetMissingEnemyTime() -- we would need to track this
-    if missingTime > 10 and gameTime > 60 then -- missing for 10 seconds after 1 min
-        return true
-    end
+    -- We don't have direct missing time; we'll approximate: if we haven't seen an enemy for a while and we are low health
+    -- For simplicity, we'll rely on the missing enemy timer from init.lua (not accessible here). We'll return false and let init.lua handle it.
     return false
 end
 
 function GameIntelligenceExtended:ShouldRequestAssist(bot, gameTime)
     -- Request assist if we are being ganked or in a tough lane
-    local enemyCount = bot:GetNearbyEnemyHeroes(800):length()
-    local allyCount = bot:GetNearbyAlliedHeroes(800):length()
-    if enemyCount > allyCount + 1 and bot:GetHealth() / bot:GetMaxHealth() < 0.5 then
+    local enemyCount = #bot:GetNearbyEnemyHeroes(800)
+    local allyCount = #bot:GetNearbyAlliedHeroes(800)
+    local healthPercent = bot:GetHealth() / bot:GetMaxHealth()
+    if enemyCount > allyCount + 1 and healthPercent < 0.5 then
         return true
     end
     return false
@@ -299,7 +316,7 @@ function GameIntelligenceExtended:ShouldBlinkDodge(bot, incomingProjectile)
     if not bot:HasAbility("item_blink") and not bot:HasAbility("antimage_blink") then
         return false
     end
-    
+
     -- Check if the projectile is likely to hit us
     local timeToImpact = self:CalculateProjectileTimeToImpact(bot, incomingProjectile)
     if timeToImpact > 0 and timeToImpact < 1.5 then -- within 1.5 seconds
@@ -339,13 +356,13 @@ end
 -- ============================================================================
 function GameIntelligenceExtended:ShouldShareEconomy(bot)
     -- Check if we are ahead as a support
-    if bot:GetRole() ~= "support" then return false end
-    local ourNetWorth = bot:GetNetWorth()
-    local enemyCarryNetWorth = self:GetEnemyCarryNetWorth()
+    if self:GetHeroRole(bot:GetUnitName()) ~= "support" then return false end
+    local ourNetWorth = self:GetNetWorth(bot)
+    local enemyCarryNetWorth = self:GetEnemyCarryNetWorth(bot)
     return ourNetWorth > enemyCarryNetWorth * 1.2 -- we are ahead by 20%
 end
 
-function GameIntelligenceExtended:GetEnemyCarryNetWorth()
+function GameIntelligenceExtended:GetEnemyCarryNetWorth(bot)
     -- Find the enemy carry and get their net worth
     local maxNetWorth = 0
     for i = 0, 9 do
@@ -354,7 +371,7 @@ function GameIntelligenceExtended:GetEnemyCarryNetWorth()
             if hero and not hero:IsNull() then
                 local role = self:GetHeroRole(hero:GetUnitName())
                 if role == "carry" then
-                    local netWorth = hero:GetNetWorth()
+                    local netWorth = self:GetNetWorth(hero)
                     if netWorth > maxNetWorth then
                         maxNetWorth = netWorth
                     end
@@ -378,6 +395,12 @@ function GameIntelligenceExtended:GetHeroRole(heroName)
     end
 end
 
+function GameIntelligenceExtended:GetNetWorth(entity)
+    -- Approximate net worth: gold + estimate of item value (we don't have item prices)
+    -- For simplicity, we'll use gold only; this is not accurate but prevents errors
+    return entity:GetGold()
+end
+
 function GameIntelligenceExtended:GetEconomyShareItems()
     -- Items to share: wards, courier upgrades, support items
     local items = {}
@@ -397,43 +420,43 @@ function GameIntelligenceExtended:GetOptimalWardSpot(bot, gameTime)
     -- Consider enemy roam patterns, common gank paths, and rune times
     local team = bot:GetTeam() == DOTA_TEAM_GOODGUYS and "radiant" or "dire"
     local spots = self:GetWardSpotsForTeam(team)
-    
+
     -- Score each spot based on:
     -- 1. Is it warded already? (lower score if yes)
     -- 2. Is it a rune spot at rune time? (higher score if yes)
     -- 3. Is it on a common gank path? (higher score if yes)
     -- 4. Is it deep in enemy territory? (higher score if yes, but more risky)
-    
+
     local bestSpot = nil
     local bestScore = -1
-    
+
     for _, spot in ipairs(spots) do
         local score = 0
         -- Check if already warded (we would need to check observer/sentry nearby)
         if self:IsSpotWarded(spot) then
             score = score - 10
         end
-        
+
         -- Rune time bonus
         if self:IsRuneSpot(spot) and self:IsRuneTime(gameTime) then
             score = score + 20
         end
-        
+
         -- Gank path bonus
         if self:IsOnGankPath(spot, team) then
             score = score + 15
         end
-        
+
         -- Depth bonus (but not too deep to be dangerous)
         local depthScore = self:CalculateSpotDepth(spot, team)
         score = score + depthScore
-        
+
         if score > bestScore then
             bestScore = score
             bestSpot = spot
         end
     end
-    
+
     return bestSpot
 end
 
@@ -460,7 +483,7 @@ end
 
 function GameIntelligenceExtended:IsOnGankPath(spot, team)
     -- Simplified: assume spots near the river are on gank paths
-    local riverY = team == "radiant" and 0 or 0 -- river is at y=0 for both? Actually, radiant river is negative y, dire positive? We'll simplify.
+    local riverY = 0 -- river is at y=0 for both? Actually, radiant river is negative y, dire positive? We'll simplify.
     return math.abs(spot.y) < 500 -- within 500 units of river
 end
 
@@ -491,7 +514,7 @@ function GameIntelligenceExtended:GetWardSpotsForTeam(team)
             {x = 0, y = 4000, type = "observer", priority = "medium", desc = "Safelane defensive"},
             {x = -1000, y = -1000, type = "observer", priority = "high", desc = "Mid river control"},
             {x = -5000, y = -3000, type = "observer", priority = "low", desc = "Enemy jungle deep"},
-            
+
             {x = -2000, y = 2000, type = "sentry", priority = "high", desc = "Deward top rune"},
             {x = 2000, y = -2000, type = "sentry", priority = "high", desc = "Deward bot rune"},
             {x = -1000, y = -1000, type = "sentry", priority = "medium", desc = "Deward mid river"},
@@ -504,7 +527,7 @@ function GameIntelligenceExtended:GetWardSpotsForTeam(team)
             {x = 0, y = -4000, type = "observer", priority = "medium", desc = "Safelane defensive"},
             {x = 1000, y = 1000, type = "observer", priority = "high", desc = "Mid river control"},
             {x = 5000, y = 3000, type = "observer", priority = "low", desc = "Enemy jungle deep"},
-            
+
             {x = 2000, y = -2000, type = "sentry", priority = "high", desc = "Deward top rune"},
             {x = -2000, y = 2000, type = "sentry", priority = "high", desc = "Deward bot rune"},
             {x = 1000, y = 1000, type = "sentry", priority = "medium", desc = "Deward mid river"},
