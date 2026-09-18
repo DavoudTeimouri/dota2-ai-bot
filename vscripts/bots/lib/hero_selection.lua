@@ -282,9 +282,4 @@ function HeroSelection:IsPicked(heroName)
     return pickedHeroes[heroName] == true
 end
 
--- Required Dota 2 API
-function Think()
-    -- Called by engine during hero selection phase
-end
-
 return HeroSelection

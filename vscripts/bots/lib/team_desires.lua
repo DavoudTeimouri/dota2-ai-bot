@@ -316,9 +316,4 @@ function TeamDesires:OnThink()
     end
 end
 
--- Required Dota 2 API
-function Think()
-    TeamDesires:OnThink()
-end
-
 return TeamDesires
