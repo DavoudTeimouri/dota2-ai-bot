@@ -1,5 +1,7 @@
 name="AetherWeaver"
 title="AetherWeaver"
+type="addon"
+version="1.0"
 description="A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messages, hints to human players, and works as a team worker. No external dependencies."
 tags="dota2,ai,bot"
 content_logo=""
