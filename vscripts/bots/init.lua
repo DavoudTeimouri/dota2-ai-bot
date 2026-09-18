@@ -432,6 +432,20 @@ function AetherWeaverMessages.get_chat_wheel()
     return AetherWeaverMessages.get_random("chat_wheel")
 end
 
+function AetherWeaverMessages.get_contextual(key)
+    return AetherWeaverMessages.contextual[key]
+end
+
+-- Send chat wheel message via Dota 2 API
+function AetherWeaverMessages.SendChatWheel(msg, bot)
+    if not bot or bot:IsNull() then return end
+    local playerID = bot:GetPlayerID()
+    if playerID then
+        -- Use Dota 2 chat wheel
+        GameRules:SendCustomMessage(msg, playerID, 0)
+    end
+end
+
 function AetherWeaverMessages.get_weighted(category, weights)
     local list = AetherWeaverMessages[category]
     if not list or #list == 0 then return nil end
@@ -673,16 +687,19 @@ function AetherWeaver:MakeGameDecisions()
         local pullAction = GameIntelligence.Support:GetPullAction(bot, gameTime)
         if pullAction then
             MaybeSay("Pulling the wave!")
+            AetherWeaverMessages.SendChatWheel("Pulling!", bot)
         end
         
         local stackAction = GameIntelligence.Support:GetStackAction(bot, gameTime)
         if stackAction then
             MaybeSay("Stacking camp!")
+            AetherWeaverMessages.SendChatWheel("Stacking!", bot)
         end
         
         local smokeAction = GameIntelligence.Support:GetSmokeGankAction(bot, gameTime)
         if smokeAction then
             MaybeSay("Smoke ganking " .. smokeAction .. " lane!")
+            AetherWeaverMessages.SendChatWheel("Smoke gank inc.", bot)
         end
         
         -- Share economy if ahead
@@ -697,6 +714,7 @@ function AetherWeaver:MakeGameDecisions()
         local target = GameIntelligence.Ganking:GetGankTarget(bot)
         if target then
             MaybeSay("Ganking " .. target:GetUnitName() .. "!")
+            AetherWeaverMessages.SendChatWheel("Ganking!", bot)
         end
     end
     
@@ -707,6 +725,7 @@ function AetherWeaver:MakeGameDecisions()
             local target = GameIntelligence.Ganking:GetGankTarget(bot)
             if target and not PlayerResource:IsFakeClient(target:GetPlayerID()) then
                 MaybeSay("Coordinated gank on human " .. target:GetUnitName() .. "!")
+                AetherWeaverMessages.SendChatWheel("Gank incoming!", bot)
                 -- Move toward target
                 bot:Action_MoveToLocation(target:GetAbsOrigin())
             end
@@ -721,6 +740,7 @@ function AetherWeaver:MakeGameDecisions()
         local pushLane = GameIntelligence.Pushing:GetPushLane(bot)
         if pushLane then
             MaybeSay("Pushing " .. pushLane .. " lane!")
+            AetherWeaverMessages.SendChatWheel("Push now or never.", bot)
         end
     end
     
@@ -742,7 +762,7 @@ function AetherWeaver:MakeGameDecisions()
         end
     end
     
-    -- Human guidance
+    -- Human guidance with chat wheel
     if math.random() < 0.001 then -- 0.1% chance per tick
         local situation = "early_game"
         if gameTime > 1800 then situation = "late_game"
@@ -750,8 +770,30 @@ function AetherWeaver:MakeGameDecisions()
         GameIntelligence.Guidance:SendTipToHumans(bot, situation)
     end
     
+    -- Chat wheel for tactical situations
+    self:SendTacticalChatWheel(bot, gameTime)
+    
     -- Communicate missing enemies and assist requests
     self:CommunicateMissingAndAssist(bot, gameTime)
+end
+
+-- Send tactical chat wheel messages
+function AetherWeaver:SendTacticalChatWheel(bot, gameTime)
+    if not bot or bot:IsNull() then return end
+    
+    -- Only occasionally
+    if math.random() < 0.005 then -- 0.5% chance per tick
+        local hpPct = bot:GetHealth() / bot:GetMaxHealth()
+        local manaPct = bot:GetMana() / bot:GetMaxMana()
+        
+        if hpPct < 0.3 then
+            AetherWeaverMessages.SendChatWheel("Retreat!", bot)
+        elseif manaPct < 0.2 and bot:GetLevel() >= 6 then
+            AetherWeaverMessages.SendChatWheel("Out of mana.", bot)
+        elseif bot:GetLevel() >= 6 and bot:GetAbilityByIndex(5) and bot:GetAbilityByIndex(5):IsFullyCastable() then
+            AetherWeaverMessages.SendChatWheel("Ult ready.", bot)
+        end
+    end
 end
 
 function AetherWeaver:GetBotRole(bot)

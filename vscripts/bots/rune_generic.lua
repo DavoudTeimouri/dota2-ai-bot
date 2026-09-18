@@ -14,26 +14,36 @@ Rune.RuneTypes = {
 }
 
 Rune.RuneSpots = {
-    -- Radiant side
-    {x = -2100, y = 1900, name = "Top Bounty"},
-    {x = 1900, y = -2100, name = "Bot Bounty"},
-    {x = -2200, y = -2200, name = "Top River"},
-    {x = 2200, y = 2200, name = "Bot River"},
-    -- Power runes (mirrored for Dire)
-    {x = 2100, y = -1900, name = "Top Bounty (Dire)"},
-    {x = -1900, y = 2100, name = "Bot Bounty (Dire)"},
+    -- Bounty runes (4 corners)
+    {x = -2100, y = 1900, name = "Top Bounty", type = "bounty"},
+    {x = 1900, y = -2100, name = "Bot Bounty", type = "bounty"},
+    {x = -1900, y = 2100, name = "Top Bounty (Dire)", type = "bounty"},
+    {x = 2100, y = -1900, name = "Bot Bounty (Dire)", type = "bounty"},
+    -- Power runes (river)
+    {x = -2200, y = -2200, name = "Top Power", type = "power"},
+    {x = 2200, y = 2200, name = "Bot Power", type = "power"},
+    -- Wisdom rune (Roshan pit area)
+    {x = -2464, y = 1824, name = "Roshan Wisdom", type = "wisdom"},
 }
 
-function Rune:GetNearestRuneSpot(bot)
+Rune.assignedBots = {}  -- Track which bot is going for which rune
+
+function Rune:GetNearestRuneSpot(bot, runeType)
     local botPos = bot:GetAbsOrigin()
     local bestSpot = nil
     local bestDist = 99999
     
     for _, spot in ipairs(self.RuneSpots) do
-        local dist = (botPos - Vector(spot.x, spot.y, 0)):Length2D()
-        if dist < bestDist then
-            bestDist = dist
-            bestSpot = spot
+        if not runeType or spot.type == runeType then
+            local key = spot.name
+            -- Check if another bot is already assigned
+            if not self.assignedBots[key] or self.assignedBots[key] == bot then
+                local dist = (botPos - Vector(spot.x, spot.y, 0)):Length2D()
+                if dist < bestDist then
+                    bestDist = dist
+                    bestSpot = spot
+                end
+            end
         end
     end
     return bestSpot, bestDist
@@ -45,23 +55,51 @@ function Rune:GetRuneAtSpot(spot)
     return nil
 end
 
+function Rune:AssignRune(bot, spotName)
+    if spotName then
+        self.assignedBots[spotName] = bot
+    end
+end
+
+function Rune:UnassignRune(bot)
+    for spotName, assignedBot in pairs(self.assignedBots) do
+        if assignedBot == bot then
+            self.assignedBots[spotName] = nil
+        end
+    end
+end
+
 function Rune:ShouldGetRune(bot, gameTime)
     local role = self:GetBotRole(bot)
     
-    -- Mid laner prioritizes power runes
+    -- Mid laner prioritizes power runes (even minutes)
     if role == "mid" then
         local minute = math.floor(gameTime / 60)
-        if minute % 2 == 0 and (gameTime % 60) < 30 then -- Even minutes, first 30 seconds
-            return true
+        if minute % 2 == 0 and (gameTime % 60) < 30 then
+            return true, "power"
         end
     end
     
-    -- Everyone can grab bounty runes
-    if gameTime % 300 < 10 then -- First 10 seconds of 5-minute cycle
-        return true
+    -- Bounty runes every 5 minutes - distribute among team
+    if gameTime % 300 < 15 then
+        return true, "bounty"
     end
     
-    return false
+    -- Wisdom rune near Roshan after 20 min
+    if gameTime > 1200 then
+        local roshanAlive = self:IsRoshanAlive()
+        if not roshanAlive then
+            return true, "wisdom"
+        end
+    end
+    
+    return false, nil
+end
+
+function Rune:IsRoshanAlive()
+    local roshan = FindUnitsInRadius(GetTeam(), Vector(-2464, 1824, 0), nil, 500, 
+        DOTA_UNIT_TARGET_TEAM_BOTH, DOTA_UNIT_TARGET_HERO, DOTA_UNIT_TARGET_FLAG_INVULNERABLE, 0, false)
+    return #roshan > 0
 end
 
 function Rune:GetBotRole(bot)
@@ -80,11 +118,18 @@ function Rune:Think(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
     
     local gameTime = DotaTime()
-    if not self:ShouldGetRune(bot, gameTime) then return end
+    local shouldGet, runeType = self:ShouldGetRune(bot, gameTime)
+    if not shouldGet then 
+        self:UnassignRune(bot)
+        return 
+    end
     
-    local spot, dist = self:GetNearestRuneSpot(bot)
-    if spot and dist < 2000 then
+    local spot, dist = self:GetNearestRuneSpot(bot, runeType)
+    if spot and dist < 3000 then
+        self:AssignRune(bot, spot.name)
         bot:Action_MoveToLocation(Vector(spot.x, spot.y, 0))
+    else
+        self:UnassignRune(bot)
     end
 end
 

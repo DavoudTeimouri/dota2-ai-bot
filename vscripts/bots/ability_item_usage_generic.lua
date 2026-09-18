@@ -43,43 +43,132 @@ function AbilityUsage:GetGenericLogic(bot)
     local logic = {}
     logic.Abilities = {}
     
-    -- Cache all abilities
+    -- Cache all abilities including ultimate
     for i = 0, 23 do
         local abil = bot:GetAbilityByIndex(i)
         if abil and not abil:IsPassive() and not abil:IsHidden() then
             table.insert(logic.Abilities, abil)
+            if abil:IsUltimate() then
+                logic.Ultimate = abil
+            end
         end
     end
     
     function logic.SkillsComplement()
-        -- Generic: use any ready ability on nearest enemy
+        -- Generic: use any ready ability on best target
         local target = self:GetBestTarget(bot)
         if not target then return end
         
+        local patchAdj = bot.patchAdjustments or {}
+        local gameTime = DotaTime()
+        
+        -- PRIORITY 1: Ultimate usage (smart timing)
+        if logic.Ultimate and logic.Ultimate:IsFullyCastable() then
+            if self:ShouldUseUltimate(bot, logic.Ultimate, target, gameTime) then
+                self:CastUltimate(bot, logic.Ultimate, target)
+                return
+            end
+        end
+        
+        -- PRIORITY 2: Regular abilities
         for _, abil in ipairs(logic.Abilities) do
-            if abil:IsFullyCastable() then
-                local castRange = abil:GetCastRange()
-                local dist = (bot:GetAbsOrigin() - target:GetAbsOrigin()):Length2D()
-                
-                if abil:GetBehavior() == DOTA_ABILITY_BEHAVIOR_UNIT_TARGET then
-                    if dist <= castRange + 200 then
-                        bot:Action_UseAbilityOnEntity(abil, target)
-                        return
+            if abil ~= logic.Ultimate then
+                if abil:IsFullyCastable() then
+                    local castRange = abil:GetCastRange()
+                    local dist = (bot:GetAbsOrigin() - target:GetAbsOrigin()):Length2D()
+                    
+                    local adj = self:ApplyPatchAdjustments(bot, abil:GetName())
+                    if not (adj.mana_conserve and bot:GetMana() / bot:GetMaxMana() < 0.5) then
+                        if abil:GetBehavior() == DOTA_ABILITY_BEHAVIOR_UNIT_TARGET then
+                            if dist <= castRange + 200 then
+                                bot:Action_UseAbilityOnEntity(abil, target)
+                                return
+                            end
+                        elseif abil:GetBehavior() == DOTA_ABILITY_BEHAVIOR_POINT then
+                            if dist <= castRange + 200 then
+                                bot:Action_UseAbilityOnLocation(abil, target:GetAbsOrigin())
+                                return
+                            end
+                        elseif abil:GetBehavior() == DOTA_ABILITY_BEHAVIOR_NO_TARGET then
+                            bot:Action_UseAbility(abil)
+                            return
+                        end
                     end
-                elseif abil:GetBehavior() == DOTA_ABILITY_BEHAVIOR_POINT then
-                    if dist <= castRange + 200 then
-                        bot:Action_UseAbilityOnLocation(abil, target:GetAbsOrigin())
-                        return
-                    end
-                elseif abil:GetBehavior() == DOTA_ABILITY_BEHAVIOR_NO_TARGET then
-                    bot:Action_UseAbility(abil)
-                    return
                 end
             end
         end
     end
     
     return logic
+end
+
+function AbilityUsage:ShouldUseUltimate(bot, ulti, target, gameTime)
+    local hpPct = bot:GetHealth() / bot:GetMaxHealth()
+    local manaPct = bot:GetMana() / bot:GetMaxMana()
+    local targetHpPct = target:GetHealth() / target:GetMaxHealth()
+    local dist = (bot:GetAbsOrigin() - target:GetAbsOrigin()):Length2D()
+    local castRange = ulti:GetCastRange()
+    
+    -- Don't use if out of range
+    if dist > castRange + 300 then return false end
+    
+    -- Always use if target is killable
+    if targetHpPct < 0.3 then return true end
+    
+    -- Use in teamfight (3+ enemies nearby)
+    local enemies = bot:GetNearbyEnemyHeroes(1000)
+    if #enemies >= 3 then return true end
+    
+    -- Hero-specific ult logic
+    local ultiName = ulti:GetName()
+    
+    -- Global ults (Zeus, Spectre, etc.) - use when enemy low anywhere
+    if ultiName:find("zeus_thundergods_wrath") or ultiName:find("spectre_haunt") then
+        return true
+    end
+    
+    -- Initiation ults (Enigma, Tidehunter, etc.) - use when multiple enemies
+    if ultiName:find("enigma_black_hole") or ultiName:find("tidehunter_ravage") or
+       ultiName:find("magnataur_reverse_polarity") or ultiName:find("earthshaker_echo_slam") then
+        return #enemies >= 2
+    end
+    
+    -- Defensive ults (Oracle, Dazzle, Abaddon) - use when ally low
+    if ultiName:find("oracle_false_promise") or ultiName:find("dazzle_shallow_grave") or
+       ultiName:find("abaddon_borrowed_time") then
+        for _, ally in ipairs(GetTeamPlayers(GetTeam())) do
+            if ally:IsAlive() and ally:GetHealth() / ally:GetMaxHealth() < 0.25 then
+                return true
+            end
+        end
+    end
+    
+    -- Burst ults (Lina, Lion, etc.) - use to finish target
+    if ultiName:find("lina_laguna_blade") or ultiName:find("lion_finger_of_death") or
+       ultiName:find("necrolyte_reapers_scythe") then
+        return targetHpPct < 0.4
+    end
+    
+    -- Transformation ults (Dragon Knight, Lone Druid) - use in fights
+    if ultiName:find("dragon_knight_elder_dragon_form") or ultiName:find("lone_druid_true_form") then
+        return #enemies >= 2 or targetHpPct < 0.5
+    end
+    
+    -- Default: use when good opportunity
+    return targetHpPct < 0.5 or #enemies >= 2
+end
+
+function AbilityUsage:CastUltimate(bot, ulti, target)
+    local behavior = ulti:GetBehavior()
+    
+    if behavior == DOTA_ABILITY_BEHAVIOR_UNIT_TARGET then
+        bot:Action_UseAbilityOnEntity(ulti, target)
+    elseif behavior == DOTA_ABILITY_BEHAVIOR_POINT then
+        bot:Action_UseAbilityOnLocation(ulti, target:GetAbsOrigin())
+    elseif behavior == DOTA_ABILITY_BEHAVIOR_NO_TARGET then
+        bot:Action_UseAbility(ulti)
+    end
+    MaybeSay("Ultimate: " .. ulti:GetName() .. "!")
 end
 
 function AbilityUsage:GetBestTarget(bot)
@@ -95,6 +184,22 @@ function AbilityUsage:GetBestTarget(bot)
             local dist = (bot:GetAbsOrigin() - enemy:GetAbsOrigin()):Length2D()
             score = score - dist / 20  -- prefer closer
             if enemy:IsMagicImmune() then score = score - 30 end
+            
+            -- PRIORITY: Human players
+            local playerID = enemy:GetPlayerID()
+            if playerID and not PlayerResource:IsFakeClient(playerID) then
+                score = score + 40
+                
+                -- Extra for human cores
+                local heroName = enemy:GetUnitName()
+                if heroName:find("antimage") or heroName:find("phantom_assassin") or 
+                   heroName:find("spectre") or heroName:find("medusa") or
+                   heroName:find("invoker") or heroName:find("storm_spirit") or
+                   heroName:find("templar_assassin") or heroName:find("nevermore") then
+                    score = score + 25
+                end
+            end
+            
             if score > bestScore then
                 bestScore = score
                 bestTarget = enemy
