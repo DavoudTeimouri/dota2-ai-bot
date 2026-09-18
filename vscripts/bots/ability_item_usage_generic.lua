@@ -1,7 +1,9 @@
 -- Ability & Item Usage System for AetherWeaver
--- Loads per-hero ability logic from BotLib or Customize/hero
+-- Loads per-hero ability logic from Customize/hero -> BotLib -> generic fallback
+-- Integrates with Patch 7.41f adjustments
 
 local AbilityUsage = {}
+local Patch741f = require("patch_741f")
 
 function AbilityUsage:Initialize(bot)
     if not bot or bot:IsNull() or not bot:IsHero() or bot:IsIllusion() then
@@ -18,6 +20,7 @@ function AbilityUsage:Initialize(bot)
     local ok, customBuild = pcall(dofile, customizePath)
     if ok and customBuild and customBuild.SkillsComplement then
         bot.abilityLogic = customBuild
+        bot.abilityLogicSource = "customize"
         return true
     end
     
@@ -26,11 +29,13 @@ function AbilityUsage:Initialize(bot)
     ok, customBuild = pcall(dofile, botlibPath)
     if ok and customBuild and customBuild.SkillsComplement then
         bot.abilityLogic = customBuild
+        bot.abilityLogicSource = "botlib"
         return true
     end
     
     -- Generic fallback
     bot.abilityLogic = self:GetGenericLogic(bot)
+    bot.abilityLogicSource = "generic"
     return true
 end
 
@@ -99,6 +104,31 @@ function AbilityUsage:GetBestTarget(bot)
     return bestTarget
 end
 
+-- Apply patch 7.41f adjustments to ability usage
+function AbilityUsage:ApplyPatchAdjustments(bot, abilityName)
+    local adjustments = bot.patchAdjustments or {}
+    
+    -- Anti-Mage: more aggressive Mana Break
+    if adjustments.mana_break_aggressive and abilityName == "antimage_mana_break" then
+        return {priority_boost = 20}
+    end
+    
+    -- Treant: conserve mana
+    if adjustments.conserve_mana then
+        local abil = bot:GetAbilityByName(abilityName)
+        if abil and abil:GetManaCost() > 100 then
+            return {mana_conserve = true}
+        end
+    end
+    
+    -- Invoker: Cold Snap less spammable
+    if adjustments.cold_snap_conserve and abilityName == "invoker_cold_snap" then
+        return {priority_reduce = 15}
+    end
+    
+    return {}
+end
+
 function AbilityUsage:Think(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
     
@@ -138,6 +168,27 @@ function AbilityUsage:UseItems(bot)
                 local behavior = itemHandle:GetBehavior()
                 local castRange = itemHandle:GetCastRange()
                 local dist = target and (bot:GetAbsOrigin() - target:GetAbsOrigin()):Length2D() or 9999
+                
+                -- Apply patch adjustments for items
+                local patchAdj = bot.patchAdjustments or {}
+                
+                -- Manta Style: ranged illusions deal less damage (less priority for ranged)
+                if itemName == "item_manta" and patchAdj.manta_ranged_nerf then
+                    -- Still use it, just slightly lower priority
+                end
+                
+                -- Mask of Madness / Satanic: reduced lifesteal (affects usage timing)
+                if (itemName == "item_mask_of_madness" or itemName == "item_satanic") and patchAdj.lifesteal_nerf then
+                    -- Use more carefully, prefer when HP is lower
+                    if target and bot:GetHealth() / bot:GetMaxHealth() > 0.5 then
+                        -- Don't use if HP is high
+                    else
+                        if behavior == DOTA_ABILITY_BEHAVIOR_NO_TARGET then
+                            bot:Action_UseAbility(itemHandle)
+                            return
+                        end
+                    end
+                end
                 
                 if behavior == DOTA_ABILITY_BEHAVIOR_UNIT_TARGET and target and dist <= castRange + 200 then
                     bot:Action_UseAbilityOnEntity(itemHandle, target)

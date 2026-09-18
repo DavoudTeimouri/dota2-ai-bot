@@ -1,8 +1,9 @@
 -- Skill Build System for AetherWeaver
+-- Loads skill build from GuideIntegration -> Customize/hero -> BotLib -> generic fallback
 
 local SkillBuild = {}
 
-function SkillBuild:Initialize(bot)
+function SkillBuild:Initialize(bot, guideSkillBuild)
     if not bot or bot:IsNull() or not bot:IsHero() or bot:IsIllusion() then
         return false
     end
@@ -12,24 +13,34 @@ function SkillBuild:Initialize(bot)
         return false
     end
     
-    -- Try Customize/hero first
+    -- Priority 1: Guide-based skill build
+    if guideSkillBuild and #guideSkillBuild > 0 then
+        bot.skillBuild = guideSkillBuild
+        bot.skillBuildSource = "guide"
+        return true
+    end
+    
+    -- Priority 2: Customize/hero (user overrides)
     local customizePath = "bots/Customize/hero/" .. string.gsub(heroName, "npc_dota_hero_", "") .. ".lua"
     local ok, customBuild = pcall(dofile, customizePath)
     if ok and customBuild and customBuild.sSkillList then
         bot.skillBuild = customBuild.sSkillList
+        bot.skillBuildSource = "customize"
         return true
     end
     
-    -- Fallback to BotLib
+    -- Priority 3: BotLib (built-in builds)
     local botlibPath = "bots/BotLib/" .. string.gsub(heroName, "npc_dota_hero_", "") .. ".lua"
     ok, customBuild = pcall(dofile, botlibPath)
     if ok and customBuild and customBuild.sSkillList then
         bot.skillBuild = customBuild.sSkillList
+        bot.skillBuildSource = "botlib"
         return true
     end
     
-    -- Generic fallback
+    -- Priority 4: Generic fallback
     bot.skillBuild = self:GetGenericSkillBuild(bot)
+    bot.skillBuildSource = "generic"
     return true
 end
 
@@ -37,13 +48,14 @@ function SkillBuild:GetGenericSkillBuild(bot)
     local heroName = bot:GetUnitName()
     local abilities = {}
     local talents = {}
+    local ultimate = nil
     
     -- Get all abilities and talents
     for i = 0, 23 do
         local abil = bot:GetAbilityByIndex(i)
         if abil and not abil:IsPassive() and not abil:IsHidden() then
             if abil:IsUltimate() then
-                -- Ultimate is handled separately
+                ultimate = abil:GetName()
             else
                 table.insert(abilities, abil:GetName())
             end
@@ -54,17 +66,18 @@ function SkillBuild:GetGenericSkillBuild(bot)
     
     -- Generic build: max first 3 abilities, then ult, then talents
     local build = {}
-    local abilityLevels = {}
     
     for level = 1, 30 do
         if level == 6 or level == 12 or level == 18 then
             -- Level up ultimate
-            table.insert(build, "ability_level_up") -- placeholder for ult
+            if ultimate then
+                table.insert(build, ultimate)
+            end
         elseif level == 10 or level == 15 or level == 20 or level == 25 then
             -- Talent
             table.insert(build, talents[math.random(#talents)] or "special_bonus_generic")
         else
-            -- Regular ability
+            -- Regular ability (rotate through non-ult abilities)
             if #abilities > 0 then
                 local abil = abilities[(level - 1) % #abilities + 1]
                 table.insert(build, abil)

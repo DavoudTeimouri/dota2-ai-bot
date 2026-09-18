@@ -15,6 +15,8 @@ local AbilityUsage = require("ability_item_usage_generic")
 local Courier = require("courier_generic")
 local Rune = require("rune_generic")
 local SkillBuild = require("skill_build_generic")
+local Patch741f = require("patch_741f")
+local GuideIntegration = require("guide_integration")
 
 -- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)
@@ -608,10 +610,26 @@ function AetherWeaver:MakeGameDecisions()
     -- Initialize subsystems
     if not bot.initialized then
         bot.initialized = true
-        ItemPurchase:Initialize(bot)
+        
+        -- Determine position/role
+        bot.position = self:GetBotPosition(bot)
+        bot.role = self:GetBotRole(bot)
+        
+        -- Load guide-based builds
+        local heroName = bot:GetUnitName()
+        local guideBuild = GuideIntegration:GetPatchAdjustedBuild(heroName, bot.position)
+        local guideSkills = GuideIntegration:GetSkillBuild(heroName, bot.position)
+        local patchAdj = Patch741f:GetHeroPlaystyleAdjustments(heroName)
+        
+        bot.guideItemBuild = guideBuild
+        bot.guideSkillBuild = guideSkills
+        bot.patchAdjustments = patchAdj
+        
+        -- Initialize subsystems with guide data
+        ItemPurchase:Initialize(bot, guideBuild)
         AbilityUsage:Initialize(bot)
-        SkillBuild:Initialize(bot)
-        Courier:Think(bot) -- Initial courier check
+        SkillBuild:Initialize(bot, guideSkills)
+        Courier:Think(bot)
     end
     
     -- Run subsystems
@@ -727,6 +745,36 @@ function AetherWeaver:GetBotRole(bot)
     for _, h in ipairs(midHeroes) do if heroName:find(h) then return "mid" end end
     for _, h in ipairs(offlaneHeroes) do if heroName:find(h) then return "offlane" end end
     return "support"
+end
+
+-- Determine bot position (1-5) based on lane assignment and team slot
+function AetherWeaver:GetBotPosition(bot)
+    local lane = bot:GetAssignedLane() or "safe"
+    local team = bot:GetTeam()
+    local playerID = bot:GetPlayerID()
+    
+    -- In Dota 2, positions are typically assigned by player slot:
+    -- Radiant: 0=Pos1, 1=Pos2, 2=Pos3, 3=Pos4, 4=Pos5
+    -- Dire: 5=Pos1, 6=Pos2, 7=Pos3, 8=Pos4, 9=Pos5
+    if team == DOTA_TEAM_GOODGUYS then
+        if playerID == 0 then return 1
+        elseif playerID == 1 then return 2
+        elseif playerID == 2 then return 3
+        elseif playerID == 3 then return 4
+        elseif playerID == 4 then return 5 end
+    else
+        if playerID == 5 then return 1
+        elseif playerID == 6 then return 2
+        elseif playerID == 7 then return 3
+        elseif playerID == 8 then return 4
+        elseif playerID == 9 then return 5 end
+    end
+    
+    -- Fallback: infer from lane
+    if lane == "safe" then return 1
+    elseif lane == "mid" then return 2
+    elseif lane == "off" then return 3
+    else return 4 end
 end
 
 -- Update missing enemy timers
