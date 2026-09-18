@@ -537,15 +537,21 @@ local function HandleChat(text)
     if cmd:find("^push%s+(%a+)") then
         local lane = cmd:match("^push%s+(%a+)")
         MaybeSay("Pushing " .. lane .. " lane!")
+        GameIntelligence.humanOrder = {type = "push", lane = lane}
     elseif cmd == "roshan" then
         MaybeSay("Let's go Roshan!")
+        GameIntelligence.humanOrder = {type = "roshan"}
     elseif cmd:find("^ward") then
         MaybeSay("Warding suggested.")
+        GameIntelligence.humanOrder = {type = "ward"}
     elseif cmd:find("^lane%s+(%a+)") then
         local lane = cmd:match("^lane%s+(%a+)")
         MaybeSay("Setting lane to " .. lane)
+    elseif cmd == "gank" then
+        MaybeSay("Coordinated gank on human players!")
+        GameIntelligence.humanOrder = {type = "gank"}
     else
-        MaybeSay("Unknown command. Try !push <lane>, !roshan, !ward, !lane <lane>")
+        MaybeSay("Unknown command. Try !push <lane>, !roshan, !ward, !lane <lane>, !gank")
     end
 end
 
@@ -691,6 +697,19 @@ function AetherWeaver:MakeGameDecisions()
         local target = GameIntelligence.Ganking:GetGankTarget(bot)
         if target then
             MaybeSay("Ganking " .. target:GetUnitName() .. "!")
+        end
+    end
+    
+    -- Coordinated human gank (team desire)
+    if GameIntelligence.GetTeamDesire and GameIntelligence:GetTeamDesire() == "human_gank" then
+        local desireValue = GameIntelligence:GetTeamDesireValue() or 0
+        if desireValue > 0.5 then
+            local target = GameIntelligence.Ganking:GetGankTarget(bot)
+            if target and not PlayerResource:IsFakeClient(target:GetPlayerID()) then
+                MaybeSay("Coordinated gank on human " .. target:GetUnitName() .. "!")
+                -- Move toward target
+                bot:Action_MoveToLocation(target:GetAbsOrigin())
+            end
         end
     end
     

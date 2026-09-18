@@ -17,6 +17,7 @@ TeamDesires.desires = {
     teamfight = 0,
     ward = 0,
     smoke = 0,
+    human_gank = 0,  -- Coordinated gank on human players
 }
 
 -- Thresholds for activating desires
@@ -26,6 +27,7 @@ local THRESHOLDS = {
     roshan = 0.75,
     teamfight = 0.65,
     smoke = 0.5,
+    human_gank = 0.6,
 }
 
 function TeamDesires:Update()
@@ -86,8 +88,79 @@ function TeamDesires:Update()
         self.desires.ward = 0.5
     end
     
+    -- Human gank desire - coordinated ganking of human players
+    self:CalculateHumanGankDesire(aliveAllies, aliveEnemies)
+    
     -- Human orders override
     self:ApplyHumanOrders()
+end
+
+function TeamDesires:CalculateHumanGankDesire(allies, enemies)
+    -- Count human enemies
+    local humanEnemies = {}
+    local humanCores = {}
+    for _, enemy in ipairs(enemies) do
+        local playerID = enemy:GetPlayerID()
+        if playerID and not PlayerResource:IsFakeClient(playerID) then
+            table.insert(humanEnemies, enemy)
+            local heroName = enemy:GetUnitName()
+            if heroName:find("antimage") or heroName:find("phantom_assassin") or 
+               heroName:find("spectre") or heroName:find("medusa") or
+               heroName:find("invoker") or heroName:find("storm_spirit") or
+               heroName:find("templar_assassin") or heroName:find("nevermore") or
+               heroName:find("puck") or heroName:find("ember_spirit") or
+               heroName:find("queenofpain") then
+                table.insert(humanCores, enemy)
+            end
+        end
+    end
+    
+    if #humanEnemies == 0 then return end
+    
+    local gameTime = DotaTime()
+    local baseDesire = 0.3
+    
+    -- Higher desire for human cores
+    if #humanCores > 0 then
+        baseDesire = baseDesire + 0.25
+    end
+    
+    -- More desire with more allies available
+    local aliveCount = #allies
+    if aliveCount >= 4 then
+        baseDesire = baseDesire + 0.2
+    elseif aliveCount >= 3 then
+        baseDesire = baseDesire + 0.1
+    end
+    
+    -- Check for smoke
+    local hasSmoke = false
+    for _, ally in ipairs(allies) do
+        if ally:HasItem("item_smoke_of_deceit") then
+            hasSmoke = true
+            break
+        end
+    end
+    if hasSmoke then
+        baseDesire = baseDesire + 0.2
+    end
+    
+    -- Time-based scaling (more aggressive mid-late game)
+    if gameTime > 1200 then
+        baseDesire = baseDesire + 0.15
+    elseif gameTime > 600 then
+        baseDesire = baseDesire + 0.1
+    end
+    
+    -- Net worth advantage
+    local netWorthDiff = self:GetNetWorthDiff()
+    if netWorthDiff > 5000 then
+        baseDesire = baseDesire + 0.1
+    elseif netWorthDiff < -5000 then
+        baseDesire = baseDesire - 0.1
+    end
+    
+    self.desires.human_gank = math.min(math.max(baseDesire, 0), 1.0)
 end
 
 function TeamDesires:GetHighestDesire()
@@ -226,6 +299,8 @@ function TeamDesires:ApplyHumanOrders()
             self.desires.smoke = 1.0
         elseif order.type == "teamfight" then
             self.desires.teamfight = 1.0
+        elseif order.type == "gank" then
+            self.desires.human_gank = 1.0
         end
         GameIntelligence.humanOrder = nil -- Consume
     end

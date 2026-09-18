@@ -659,6 +659,22 @@ function GameIntelligence.Ganking:GetGankTarget(bot)
                 -- Check for vision
                 if not hero:HasModifier("modifier_truesight") then score = score + 10 end
                 
+                -- PRIORITY: Human players over bots (aggressive toward humans)
+                if not PlayerResource:IsFakeClient(i) then
+                    score = score + 40  -- Significant bonus for human targets
+                end
+                
+                -- Bonus for high-value human targets (carry/mid roles)
+                if not PlayerResource:IsFakeClient(i) then
+                    local heroName = hero:GetUnitName()
+                    if heroName:find("antimage") or heroName:find("phantom_assassin") or 
+                       heroName:find("spectre") or heroName:find("medusa") or
+                       heroName:find("invoker") or heroName:find("storm_spirit") or
+                       heroName:find("templar_assassin") or heroName:find("nevermore") then
+                        score = score + 25  -- Extra for human cores
+                    end
+                end
+                
                 if score > bestScore then
                     bestScore = score
                     bestTarget = hero
@@ -892,6 +908,25 @@ function GameIntelligence.Guidance:SendTipToHumans(bot, situation)
         -- Send via chat wheel or chat
         GameRules:SendCustomMessage("🤖 " .. tip, 0, 0)
     end
+end
+
+-- ============================================================================
+-- 10. TEAM DESIRE COORDINATION
+-- ============================================================================
+GameIntelligence.teamDesire = "farm"
+GameIntelligence.teamDesireValue = 0
+
+function GameIntelligence.SetTeamDesire(desire, value)
+    GameIntelligence.teamDesire = desire
+    GameIntelligence.teamDesireValue = value or 0
+end
+
+function GameIntelligence:GetTeamDesire()
+    return GameIntelligence.teamDesire
+end
+
+function GameIntelligence:GetTeamDesireValue()
+    return GameIntelligence.teamDesireValue
 end
 
 -- ============================================================================
