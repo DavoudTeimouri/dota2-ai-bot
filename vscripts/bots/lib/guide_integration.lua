@@ -275,7 +275,7 @@ end
 -- Get patch-adjusted build (integrates with patch_741f.lua)
 function GuideIntegration:GetPatchAdjustedBuild(heroName, position)
     local build = self:GetItemBuild(heroName, position)
-    local patch = require("patch_741f")
+    local patch = require("lib/patch_741f")
     
     -- Apply patch adjustments (costs, stats)
     -- The actual purchase logic in item_purchase_generic.lua should use patch:GetItemCost()

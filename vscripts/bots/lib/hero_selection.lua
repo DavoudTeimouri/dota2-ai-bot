@@ -2,8 +2,8 @@
 -- Sequential pick/ban with role-specific intelligence
 
 local HeroSelection = {}
-local GuideIntegration = require("guide_integration")
-local Patch741f = require("patch_741f")
+local GuideIntegration = require("lib/guide_integration")
+local Patch741f = require("lib/patch_741f")
 
 -- Role-to-position mapping for guide lookup
 local ROLE_TO_POSITION = {

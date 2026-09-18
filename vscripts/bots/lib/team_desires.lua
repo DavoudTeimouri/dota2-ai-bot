@@ -1,7 +1,7 @@
 -- Team Desires: High-level strategic coordination
 local TeamDesires = {}
-local GameIntelligence = require("game_intelligence")
-local GuideIntegration = require("guide_integration")
+local GameIntelligence = require("lib/game_intelligence")
+local GuideIntegration = require("lib/guide_integration")
 
 -- Team-wide desire weights
 TeamDesires.desires = {

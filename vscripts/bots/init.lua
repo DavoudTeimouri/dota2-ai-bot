@@ -7,16 +7,16 @@ local AetherWeaver = {}
 -- ============================================================================
 -- LOAD MODULES
 -- ============================================================================
-local BotNames = require("bot_names")
-local GameIntelligence = require("game_intelligence")
-local GameIntelligenceExtended = require("game_intelligence_extended")
-local ItemPurchase = require("item_purchase_generic")
-local AbilityUsage = require("ability_item_usage_generic")
-local Courier = require("courier_generic")
-local Rune = require("rune_generic")
-local SkillBuild = require("skill_build_generic")
-local Patch741f = require("patch_741f")
-local GuideIntegration = require("guide_integration")
+local BotNames = require("lib/bot_names")
+local GameIntelligence = require("lib/game_intelligence")
+local GameIntelligenceExtended = require("lib/game_intelligence_extended")
+local ItemPurchase = require("lib/item_purchase_generic")
+local AbilityUsage = require("lib/ability_item_usage_generic")
+local Courier = require("lib/courier_generic")
+local Rune = require("lib/rune_generic")
+local SkillBuild = require("lib/skill_build_generic")
+local Patch741f = require("lib/patch_741f")
+local GuideIntegration = require("lib/guide_integration")
 
 -- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)

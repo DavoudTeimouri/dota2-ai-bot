@@ -3,7 +3,7 @@
 -- Integrates with Patch 7.41f cost changes
 
 local ItemPurchase = {}
-local Patch741f = require("patch_741f")
+local Patch741f = require("lib/patch_741f")
 
 function ItemPurchase:Initialize(bot, guideBuild)
     if not bot or bot:IsNull() or not bot:IsHero() or bot:IsIllusion() then
