@@ -9,6 +9,8 @@ local AetherWeaver = {}
 -- ============================================================================
 local GameIntelligence = require("game_intelligence")
 local GameIntelligenceExtended = require("game_intelligence_extended")
+local ItemPurchase = require("item_purchase_generic")
+local AbilityUsage = require("ability_item_usage_generic")
 
 -- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)
@@ -616,12 +618,25 @@ function AetherWeaver:MakeGameDecisions()
     end
     
     -- Get farm target
-    local farmTarget = GameIntelligence.Farming:GetBestFarmTarget(bot, gameTime)
-    if farmTarget then
-        bot:AttackTarget(farmTarget)
-    end
-    
-    -- Support actions
+        local farmTarget = GameIntelligence.Farming:GetBestFarmTarget(bot, gameTime)
+        if farmTarget then
+            bot:AttackTarget(farmTarget)
+        end
+
+        -- Item purchase
+        ItemPurchase.PurchaseItem(bot)
+
+        -- Ability usage
+        local ability, target = AbilityUsage.GetAbilityUsage(bot)
+        if ability and target then
+            if type(target) == "userdata" and target.IsAlive and target:IsAlive() then
+                bot:CastAbilityOnTarget(target, ability)
+            elseif type(target) == "table" and target.x and target.y and target.z then
+                bot:CastAbilityOnPosition(target, ability)
+            end
+        end
+
+        -- Support actions
     if bot:GetRole() == "support" then
         local wardAction = GameIntelligence.Support:GetNextWardAction(bot, gameTime)
         if wardAction then
