@@ -1,4 +1,4 @@
--- AetherWeaver Dota 2 Bot
+-- AetherWeaver Dota 2 Bot - Main Entry Point
 -- Workshop addon: vscripts/bots/init.lua
 
 -- Module table
@@ -7,8 +7,14 @@ local AetherWeaver = {}
 -- ============================================================================
 -- LOAD MODULES
 -- ============================================================================
+local BotNames = require("bot_names")
 local GameIntelligence = require("game_intelligence")
 local GameIntelligenceExtended = require("game_intelligence_extended")
+local ItemPurchase = require("item_purchase_generic")
+local AbilityUsage = require("ability_item_usage_generic")
+local Courier = require("courier_generic")
+local Rune = require("rune_generic")
+local SkillBuild = require("skill_build_generic")
 
 -- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)
@@ -327,11 +333,6 @@ AetherWeaverMessages.contextual = {
     pudge_in_game = "Pudge in game. Hook from fog: inevitable. My death: guaranteed.",
     wisp_in_game = "Io picked. Tether relay: engaged. My understanding of this hero: zero.",
     arc_warden_in_game = "Arc Warden. Double items. Double micro. Double my confusion.",
-    chen_in_game = "Chen. Jungle control. Centaur stun. Wildwings. My ban list: updated.",
-    enchantress_in_game = "Enchantress. Impetus hurt. Enchant creep. My HP bar: melting.",
-    huskar_in_game = "Huskar. Low HP = High Damage. My brain: 'Engage.' My HP: 0.",
-    spectre_in_game = "Spectre. Haunt global. Reality: I can't click her illusions fast enough.",
-    tinker_in_game = "Tinker. Rearm. Boots of Travel. Map presence: everywhere. My sanity: nowhere.",
     naga_in_game = "Naga Siren. Song of the Siren. Sleep setup. My BKB: 'Wait for song.'",
     void_in_game = "Faceless Void. Chronosphere. 'Don't chrono your team.' *Chronos team*",
     magnus_in_game = "Magnus. Reverse Polarity. Skewer. Empower. My team: grouped. Perfect.",
@@ -454,7 +455,7 @@ end
 local MSG_COOLDOWN = 8.0
 local lastMsg = 0
 local lastLaneChange = 0
-local missingEnemyTimer = {} -- track how long enemies have been missing
+local missingEnemyTimer = {}
 
 -- Helper: Send chat message
 local function Say(msg, playerID)
@@ -516,7 +517,7 @@ local function PickHeroAfterHumans()
     return heroName
 end
 
--- Assign lane by hero (using GameIntelligenceExtended for priority)
+-- Assign lane by hero
 local function AssignLane(heroName)
     local laneMap = {
         npc_dota_hero_antimage = "safe", npc_dota_hero_juggernaut = "safe", npc_dota_hero_phantom_assassin = "safe", npc_dota_hero_spectre = "safe",
@@ -599,10 +600,26 @@ function AetherWeaver:BotThink()
     end
 end
 
--- Main decision making loop using GameIntelligence and GameIntelligenceExtended
+-- Main decision making loop
 function AetherWeaver:MakeGameDecisions()
     local bot = self.hero
     local gameTime = GameRules:GetGameTime()
+    
+    -- Initialize subsystems
+    if not bot.initialized then
+        bot.initialized = true
+        ItemPurchase:Initialize(bot)
+        AbilityUsage:Initialize(bot)
+        SkillBuild:Initialize(bot)
+        Courier:Think(bot) -- Initial courier check
+    end
+    
+    -- Run subsystems
+    ItemPurchase:Think(bot)
+    AbilityUsage:Think(bot)
+    SkillBuild:Think(bot)
+    Courier:Think(bot)
+    Rune:Think(bot)
     
     -- Update missing enemy timers
     self:UpdateMissingEnemyTimers(gameTime)
@@ -618,11 +635,11 @@ function AetherWeaver:MakeGameDecisions()
     -- Get farm target
     local farmTarget = GameIntelligence.Farming:GetBestFarmTarget(bot, gameTime)
     if farmTarget then
-        bot:AttackTarget(farmTarget)
+        bot:Action_AttackUnit(farmTarget, true)
     end
     
     -- Support actions
-    if bot:GetRole() == "support" then
+    if self:GetBotRole(bot) == "support" then
         local wardAction = GameIntelligence.Support:GetNextWardAction(bot, gameTime)
         if wardAction then
             MaybeSay("Placing ward at " .. wardAction.desc)
@@ -632,26 +649,22 @@ function AetherWeaver:MakeGameDecisions()
         local pullAction = GameIntelligence.Support:GetPullAction(bot, gameTime)
         if pullAction then
             MaybeSay("Pulling the wave!")
-            -- Pull logic here
         end
         
         local stackAction = GameIntelligence.Support:GetStackAction(bot, gameTime)
         if stackAction then
             MaybeSay("Stacking camp!")
-            -- Stack logic here
         end
         
         local smokeAction = GameIntelligence.Support:GetSmokeGankAction(bot, gameTime)
         if smokeAction then
             MaybeSay("Smoke ganking " .. smokeAction .. " lane!")
-            -- Smoke gank logic here
         end
         
         -- Share economy if ahead
         if GameIntelligenceExtended:ShouldShareEconomy(bot) then
             local shareItems = GameIntelligenceExtended:GetEconomyShareItems()
             MaybeSay("I'm ahead! Sharing: " .. table.concat(shareItems, ", "))
-            -- Actually give items to courier or allies (not implemented)
         end
     end
     
@@ -660,7 +673,6 @@ function AetherWeaver:MakeGameDecisions()
         local target = GameIntelligence.Ganking:GetGankTarget(bot)
         if target then
             MaybeSay("Ganking " .. target:GetUnitName() .. "!")
-            -- Gank logic here
         end
     end
     
@@ -672,7 +684,6 @@ function AetherWeaver:MakeGameDecisions()
         local pushLane = GameIntelligence.Pushing:GetPushLane(bot)
         if pushLane then
             MaybeSay("Pushing " .. pushLane .. " lane!")
-            -- Push logic here
         end
     end
     
@@ -682,12 +693,12 @@ function AetherWeaver:MakeGameDecisions()
         local target = GameIntelligence.TeamFight:FindBestTarget(bot, enemies)
         if target then
             local position = GameIntelligence.TeamFight:GetBestPosition(bot, target)
-            bot:MoveToPosition(position)
+            bot:Action_MoveToLocation(position)
             
             local abilities = GameIntelligence.TeamFight:GetAbilityUsage(bot, target)
             for _, abil in ipairs(abilities) do
                 if abil:IsFullyCastable() then
-                    bot:CastAbilityOnTarget(target, abil)
+                    bot:Action_UseAbilityOnTarget(abil, target)
                     break
                 end
             end
@@ -706,25 +717,33 @@ function AetherWeaver:MakeGameDecisions()
     self:CommunicateMissingAndAssist(bot, gameTime)
 end
 
+function AetherWeaver:GetBotRole(bot)
+    local heroName = bot:GetUnitName()
+    local carryHeroes = {"antimage", "juggernaut", "phantom_assassin", "spectre", "medusa", "drow_ranger", "luna", "faceless_void", "terrorblade", "morphling"}
+    local midHeroes = {"invoker", "storm_spirit", "templar_assassin", "puck", "ember_spirit", "queenofpain", "shadow_fiend", "zeus", "tinker", "pugna"}
+    local offlaneHeroes = {"centaur", "tidehunter", "dragon_knight", "axe", "mars", "underlord", "dark_seer", "bristleback", "timbersaw", "slardar"}
+    
+    for _, h in ipairs(carryHeroes) do if heroName:find(h) then return "carry" end end
+    for _, h in ipairs(midHeroes) do if heroName:find(h) then return "mid" end end
+    for _, h in ipairs(offlaneHeroes) do if heroName:find(h) then return "offlane" end end
+    return "support"
+end
+
 -- Update missing enemy timers
 function AetherWeaver:UpdateMissingEnemyTimers(gameTime)
     for i = 0, 9 do
-        if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= bot:GetTeam() then
+        if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= self.hero:GetTeam() then
             local hero = PlayerResource:GetSelectedHeroEntity(i)
             if hero and not hero:IsNull() then
-                -- If we can see the hero, reset timer
                 if hero:IsAlive() and not hero:IsNull() and hero:GetHealth() > 0 then
                     missingEnemyTimer[i] = 0
                 else
-                    -- Hero is dead or invisible, increment timer
                     missingEnemyTimer[i] = missingEnemyTimer[i] + 1
                 end
             else
-                -- No hero selected, increment timer
                 missingEnemyTimer[i] = missingEnemyTimer[i] + 1
             end
         else
-            -- Invalid player, reset timer
             missingEnemyTimer[i] = 0
         end
     end
@@ -737,18 +756,12 @@ function AetherWeaver:GetBestLane(bot, gameTime)
     
     local lanes = {"safe", "mid", "off", "jungle"}
     for _, lane in ipairs(lanes) do
-        -- Get the primary enemy hero in this lane (simplified)
         local enemyInLane = self:GetPrimaryEnemyInLane(bot, lane)
         local score = GameIntelligenceExtended:GetLanePriority(bot, lane, enemyInLane)
         
-        -- Adjust for missing enemies (safer if enemy missing)
         if not enemyInLane then
             score = score + 10
         end
-        
-        -- Adjust for lane priority from base intelligence
-        local baseScore = GameIntelligence.Lanes:GetLanePriority(bot, lane, gameTime) -- we don't have this, so skip
-        -- We'll just use the extended score for now
         
         if score > bestScore then
             bestScore = score
@@ -761,42 +774,38 @@ end
 
 -- Get the primary enemy hero in a lane (simplified)
 function AetherWeaver:GetPrimaryEnemyInLane(bot, lane)
-    -- This is a placeholder; we would need to define lane boundaries and check enemy positions
+    -- Placeholder: would need to define lane boundaries and check enemy positions
     return nil
 end
 
 -- Try to blink dodge incoming projectiles
 function AetherWeaver:TryBlinkDodge(bot)
-    -- Check if bot has blink ability
     if not (bot:HasAbility("item_blink") or bot:HasAbility("antimage_blink")) then
         return
     end
     
-    -- Get incoming projectiles (we would need to scan for projectiles)
-    local projectiles = bot:GetIncomingProjectiles() -- we don't have this function, so skip
+    -- Check incoming projectiles
+    local projectiles = {} -- bot:GetIncomingProjectiles() - not available
     -- For now, we do nothing
 end
 
 -- Communicate missing enemies and assist requests
 function AetherWeaver:CommunicateMissingAndAssist(bot, gameTime)
-    -- Check for missing enemies that have been missing for a while
     for i = 0, 9 do
         if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= bot:GetTeam() then
             local missingTime = missingEnemyTimer[i]
-            if missingTime > 150 then -- missing for 150 ticks (2.5 seconds at 60 ticks per second? Actually, our timer increments every second in BotThink? We call this every second, so missingTime is in seconds)
+            if missingTime > 30 then -- missing for 30 seconds
                 local hero = PlayerResource:GetSelectedHeroEntity(i)
                 if hero and not hero:IsNull() then
                     local heroName = hero:GetUnitName()
                     local msg = GameIntelligenceExtended:GetPingMessageForMissingEnemy(heroName)
                     MaybeSay(msg)
-                    -- Reset timer to avoid spamming
                     missingEnemyTimer[i] = 0
                 end
             end
         end
     end
     
-    -- Check if we should request assist
     if GameIntelligenceExtended:ShouldRequestAssist(bot, gameTime) then
         local msg = GameIntelligenceExtended:GetAssistRequestMessage()
         MaybeSay(msg)
@@ -809,7 +818,7 @@ function Activate()
     GameRules:GetGameModeEntity():SetThink("BotThink", AetherWeaver, 0.1)
 end
 
--- Make sure Timers library is available (Dota 2 provides it in addon context)
+-- Make sure Timers library is available
 if not Timers then
     Timers = {}
     function Timers:CreateTimer(delay, callback)
