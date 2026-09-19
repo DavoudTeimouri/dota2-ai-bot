@@ -9,6 +9,8 @@ local AetherWeaver = {}
 -- ============================================================================
 local GameIntelligence = require("game_intelligence")
 local GameIntelligenceExtended = require("game_intelligence_extended")
+local HeroSelection = require("hero_selection")
+local TeamDesires = require("team_desires")
 local ItemPurchase = require("item_purchase_generic")
 local AbilityUsage = require("ability_item_usage_generic")
 
@@ -543,8 +545,12 @@ local function HandleChat(text)
     elseif cmd:find("^lane%s+(%a+)") then
         local lane = cmd:match("^lane%s+(%a+)")
         MaybeSay("Setting lane to " .. lane)
+    elseif cmd == "gank" then
+        -- Set human gank order for team coordination
+        GameIntelligence.humanOrder = {type = "gank"}
+        MaybeSay("Gank order received! Coordinating team gank on human targets.")
     else
-        MaybeSay("Unknown command. Try !push <lane>, !roshan, !ward, !lane <lane>")
+        MaybeSay("Unknown command. Try !push <lane>, !roshan, !ward, !lane <lane>, !gank")
     end
 end
 
@@ -555,11 +561,14 @@ function AetherWeaver:BotThink()
         print('[AetherWeaver] Initialized')
         
         -- Initialize missing enemy timers
-        for i = 0, 9 do
-            missingEnemyTimer[i] = 0
-        end
-        
-        -- Listen for chat
+            for i = 0, 9 do
+                missingEnemyTimer[i] = 0
+            end
+    
+            -- Initialize TeamDesires
+            TeamDesires:Think() -- Initialize
+    
+            -- Listen for chat
         ListenToGameEvent("player_chat", function(keys)
             if keys.text then HandleChat(keys.text) end
         end, self)
@@ -595,6 +604,8 @@ function AetherWeaver:BotThink()
         Timers:CreateTimer(1.0, function()
             if self.hero and not self.hero:IsNull() then
                 self:MakeGameDecisions()
+                -- Update team desires
+                TeamDesires:Think()
             end
             return 1.0
         end)
@@ -605,6 +616,33 @@ end
 function AetherWeaver:MakeGameDecisions()
     local bot = self.hero
     local gameTime = GameRules:GetGameTime()
+    
+    -- Update team desires
+    TeamDesires:Think()
+    
+    -- Get highest team desire
+    local desireType, desireValue = TeamDesires:GetHighestDesire()
+    
+    -- Execute based on highest desire
+    if desireType == TeamDesires.DESIRE_TYPES.HUMAN_GANK and desireValue > 0.5 then
+        self:ExecuteCoordinatedGank(bot, gameTime)
+        return
+    elseif desireType == TeamDesires.DESIRE_TYPES.SMOKE and desireValue > 0.5 then
+        self:ExecuteSmokeGank(bot, gameTime)
+        return
+    elseif desireType == TeamDesires.DESIRE_TYPES.ROSHAN and desireValue > 0.5 then
+        self:ExecuteRoshan(bot, gameTime)
+        return
+    elseif desireType == TeamDesires.DESIRE_TYPES.PUSH and desireValue > 0.6 then
+        self:ExecutePush(bot, gameTime)
+        return
+    elseif desireType == TeamDesires.DESIRE_TYPES.DEFEND and desireValue > 0.6 then
+        self:ExecuteDefend(bot, gameTime)
+        return
+    elseif desireType == TeamDesires.DESIRE_TYPES.RETREAT and desireValue > 0.5 then
+        self:ExecuteRetreat(bot)
+        return
+    end
     
     -- Update missing enemy timers
     self:UpdateMissingEnemyTimers(gameTime)
@@ -816,6 +854,48 @@ function AetherWeaver:CommunicateMissingAndAssist(bot, gameTime)
         local msg = GameIntelligenceExtended:GetAssistRequestMessage()
         MaybeSay(msg)
     end
+end
+
+-- Execute coordinated gank on human target
+function AetherWeaver:ExecuteCoordinatedGank(bot, gameTime)
+    local target = GameIntelligence.Ganking:GetGankTarget(bot)
+    if target and not PlayerResource:IsFakeClient(target:GetPlayerID()) then
+        MaybeSay("Coordinated gank on human " .. target:GetUnitName() .. "!")
+        -- Gank logic would go here
+    end
+end
+
+-- Execute smoke gank
+function AetherWeaver:ExecuteSmokeGank(bot, gameTime)
+    MaybeSay("Smoke gank incoming!")
+    -- Smoke gank logic would go here
+end
+
+-- Execute Roshan attempt
+function AetherWeaver:ExecuteRoshan(bot, gameTime)
+    MaybeSay("Going for Roshan!")
+    -- Roshan logic would go here
+end
+
+-- Execute push
+function AetherWeaver:ExecutePush(bot, gameTime)
+    local pushLane = GameIntelligence.Pushing:GetPushLane(bot)
+    if pushLane then
+        MaybeSay("Pushing " .. pushLane .. " lane!")
+        -- Push logic would go here
+    end
+end
+
+-- Execute defend
+function AetherWeaver:ExecuteDefend(bot, gameTime)
+    MaybeSay("Defending high ground!")
+    -- Defend logic would go here
+end
+
+-- Execute retreat
+function AetherWeaver:ExecuteRetreat(bot)
+    MaybeSay("Retreat!")
+    -- Retreat logic would go here
 end
 
 -- Entry point
