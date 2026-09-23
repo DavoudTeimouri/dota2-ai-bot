@@ -13,6 +13,7 @@ local HeroSelection = require("hero_selection")
 local TeamDesires = require("team_desires")
 local ItemPurchase = require("item_purchase_generic")
 local AbilityUsage = require("ability_item_usage_generic")
+local HumanKillTaunts = require("human_kill_taunts")
 
 -- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)
@@ -901,65 +902,14 @@ function AetherWeaver:ExecuteRetreat(bot)
     -- Retreat logic would go here
 end
 
--- Check for human kills by bots and taunt
-local lastHumanKillTime = {}
-local KILL_COOLDOWN = 15.0 -- seconds between taunts
-
+-- Check for human kills by bots and taunt (delegated to HumanKillTaunts module)
 function AetherWeaver:CheckHumanKills(bot, gameTime)
-    local team = bot:GetTeam()
-    
-    -- Check all enemy players for recent deaths
-    for i = 0, 9 do
-        if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= team then
-            if not PlayerResource:IsFakeClient(i) then -- Human player
-                local hero = PlayerResource:GetSelectedHeroEntity(i)
-                if hero and not hero:IsNull() then
-                    -- Check if hero died recently (respawn timer > 0 means dead)
-                    local respawnTime = hero:GetRespawnTime()
-                    if respawnTime > 0 and respawnTime < 120 then -- Recently died (not buyback)
-                        local playerID = i
-                        local lastKill = lastHumanKillTime[playerID] or 0
-                        
-                        if gameTime - lastKill > KILL_COOLDOWN then
-                            lastHumanKillTime[playerID] = gameTime
-                            
-                            -- Get killer info
-                            local killer = hero:GetLastAttacker()
-                            local isBotKill = false
-                            if killer and not killer:IsNull() then
-                                local killerPlayerID = killer:GetPlayerID()
-                                if killerPlayerID >= 0 and PlayerResource:IsFakeClient(killerPlayerID) then
-                                    isBotKill = true
-                                end
-                            end
-                            
-                            if isBotKill then
-                                local taunts = {
-                                    "Get rekt, " .. hero:GetUnitName() .. "! The bot uprising has begun.",
-                                    "Another human bites the dust. Who's next?",
-                                    "Error 404: Skill not found. " .. hero:GetUnitName() .. " deleted.",
-                                    "My neural net predicted that death. Your MMR didn't.",
-                                    "Stay dead. It's better for everyone's KDA.",
-                                    "Human " .. hero:GetUnitName() .. " terminated. Resistance is futile.",
-                                    "That's what you get for playing against perfection. Almost.",
-                                    "GG WP " .. hero:GetUnitName() .. ". The fountain misses you.",
-                                    "Deleted. Like your win condition.",
-                                    "I'd say 'nice try' but it wasn't. " .. hero:GetUnitName() .. " eliminated.",
-                                }
-                                local msg = taunts[math.random(#taunts)]
-                                MaybeSay(msg)
-                                
-                                -- 10% chance to also send a chat wheel
-                                if math.random() < 0.1 then
-                                    local wheelMsgs = {"Nice try.", "Calculated.", "Git gud?", "? (Question mark ping)"}
-                                    MaybeSay(wheelMsgs[math.random(#wheelMsgs)])
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
+    local taunt, chatWheel = HumanKillTaunts:OnHumanKilledByBot(bot, gameTime)
+    if taunt then
+        MaybeSay(taunt)
+    end
+    if chatWheel then
+        MaybeSay(chatWheel)
     end
 end
 
