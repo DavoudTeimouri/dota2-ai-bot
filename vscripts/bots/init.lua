@@ -11,9 +11,11 @@ local GameIntelligence = require("game_intelligence")
 local GameIntelligenceExtended = require("game_intelligence_extended")
 local HeroSelection = require("hero_selection")
 local TeamDesires = require("team_desires")
+local BotNames = require("bot_names")
 local ItemPurchase = require("item_purchase_generic")
 local AbilityUsage = require("ability_item_usage_generic")
 local HumanKillTaunts = require("human_kill_taunts")
+local RuneGeneric = require("rune_generic")
 
 -- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)
@@ -562,14 +564,20 @@ function AetherWeaver:BotThink()
         print('[AetherWeaver] Initialized')
         
         -- Initialize missing enemy timers
-            for i = 0, 9 do
-                missingEnemyTimer[i] = 0
-            end
-    
-            -- Initialize TeamDesires
-            TeamDesires:Think() -- Initialize
-    
-            -- Listen for chat
+        for i = 0, 9 do
+            missingEnemyTimer[i] = 0
+        end
+        
+        -- Initialize TeamDesires
+        TeamDesires:Think() -- Initialize
+        
+        -- Initialize BotNames
+        BotNames:Reset()
+        
+        -- Initialize RuneGeneric
+        RuneGeneric:Reset()
+        
+        -- Listen for chat
         ListenToGameEvent("player_chat", function(keys)
             if keys.text then HandleChat(keys.text) end
         end, self)
@@ -578,6 +586,13 @@ function AetherWeaver:BotThink()
         Timers:CreateTimer(2.0, function()
             local hero = PickHeroAfterHumans()
             local lane = AssignLane(hero)
+            
+            -- Set custom bot name
+            local bot = self.hero
+            if bot and not bot:IsNull() then
+                BotNames:SetBotName(bot, bot:GetTeam())
+            end
+            
             local msg = string.format(AetherWeaverMessages.get_random("greetings") or "I will play %s in the %s lane.", hero, lane)
             MaybeSay(msg)
         end)
@@ -610,6 +625,14 @@ function AetherWeaver:BotThink()
             end
             return 1.0
         end)
+    end
+    
+    -- Call HeroSelection Think for pick/ban phase
+    HeroSelection:Think()
+    
+    -- Call RuneGeneric Think
+    if self.hero and not self.hero:IsNull() then
+        RuneGeneric:Think(self.hero)
     end
 end
 
@@ -680,7 +703,18 @@ function AetherWeaver:MakeGameDecisions()
         local wardAction = GameIntelligence.Support:GetNextWardAction(bot, gameTime)
         if wardAction then
             MaybeSay("Placing ward at " .. wardAction.desc)
-            -- Place ward logic here
+            -- Actually place the ward
+            local wardItem = nil
+            for slot = 0, 8 do
+                local item = bot:GetItemInSlot(slot)
+                if item and (item:GetName() == "item_ward_observer" or item:GetName() == "item_ward_sentry") then
+                    wardItem = item
+                    break
+                end
+            end
+            if wardItem then
+                bot:Action_UseAbilityOnLocation(wardItem, Vector(wardAction.x, wardAction.y, 0))
+            end
         end
         
         local pullAction = GameIntelligence.Support:GetPullAction(bot, gameTime)

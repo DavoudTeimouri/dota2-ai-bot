@@ -283,10 +283,81 @@ function HeroSelection:Think()
         print("[HeroSelection] Initialized")
     end
     
-    -- In a real implementation, this would read GameRules state
-    -- For now, return empty to let init.lua handle picking via -pick command
-    -- This module primarily provides the GetBestPick/GetBanRecommendations API
-    return
+    local gameState = GameRules:State_Get()
+    if gameState ~= DOTA_GAMERULES_STATE_HERO_SELECTION then
+        return
+    end
+    
+    local bot = GetBot()
+    if not bot or bot:IsNull() then return end
+    
+    local playerID = bot:GetPlayerID()
+    if playerID < 0 or playerID > 9 then return end
+    
+    -- Get current pick/ban state
+    local pickState = GetHeroPickState()
+    if not pickState then return end
+    
+    local team = bot:GetTeam()
+    local isRadiant = team == DOTA_TEAM_GOODGUYS
+    local teamKey = isRadiant and "radiant" or "dire"
+    
+    -- Get current phase
+    local phase = pickState.phase or "ban"
+    local currentPicker = pickState.currentPicker
+    
+    -- Check if it's our turn
+    if currentPicker ~= playerID then
+        return
+    end
+    
+    -- Collect enemy picks and banned heroes
+    local enemyPicks = {}
+    local bannedHeroes = {}
+    
+    for _, pick in ipairs(pickState.picks or {}) do
+        if pick.team ~= teamKey then
+            table.insert(enemyPicks, pick.hero)
+        end
+    end
+    
+    for _, ban in ipairs(pickState.bans or {}) do
+        table.insert(bannedHeroes, ban.hero)
+    end
+    
+    -- Get human roles on our team
+    local humanRoles = {}
+    for i = 0, 9 do
+        if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) == team and not PlayerResource:IsFakeClient(i) then
+            local hero = PlayerResource:GetSelectedHeroEntity(i)
+            if hero and not hero:IsNull() then
+                local name = hero:GetUnitName()
+                if name:find("antimage") or name:find("juggernaut") or name:find("phantom_assassin") or name:find("spectre") or name:find("medusa") then
+                    humanRoles.carry = true
+                elseif name:find("invoker") or name:find("storm") or name:find("templar") or name:find("puck") or name:find("ember") then
+                    humanRoles.mid = true
+                elseif name:find("centaur") or name:find("tidehunter") or name:find("dragon_knight") or name:find("axe") or name:find("mars") then
+                    humanRoles.offlane = true
+                else
+                    humanRoles.support = true
+                end
+            end
+        end
+    end
+    
+    if phase == "ban" then
+        local bans = self:GetBanRecommendations(enemyPicks, bannedHeroes)
+        if #bans > 0 then
+            Say("-ban " .. bans[1].hero)
+            print("[HeroSelection] Banned: " .. bans[1].hero)
+        end
+    elseif phase == "pick" then
+        local pick = self:GetBestPick(humanRoles, enemyPicks, bannedHeroes)
+        if pick then
+            Say("-pick " .. pick)
+            print("[HeroSelection] Picked: " .. pick)
+        end
+    end
 end
 
 -- Export for use by init.lua
