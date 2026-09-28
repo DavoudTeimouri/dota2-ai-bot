@@ -636,7 +636,6 @@ function AetherWeaver:BotThink()
     end
 end
 
--- Main decision making loop using GameIntelligence and GameIntelligenceExtended
 function AetherWeaver:MakeGameDecisions()
     local bot = self.hero
     local gameTime = GameRules:GetGameTime()
@@ -700,7 +699,7 @@ function AetherWeaver:MakeGameDecisions()
 
         -- Support actions
     if bot:GetRole() == "support" then
-        local wardAction = GameIntelligence.Support:GetNextWardAction(bot, gameTime)
+        local wardAction = self:GetWardAction(bot, gameTime)
         if wardAction then
             MaybeSay("Placing ward at " .. wardAction.desc)
             -- Actually place the ward
@@ -868,8 +867,81 @@ function AetherWeaver:TryBlinkDodge(bot)
     -- For now, we do nothing
 end
 
--- Communicate missing enemies and assist requests
-function AetherWeaver:CommunicateMissingAndAssist(bot, gameTime)
+-- Helper: Get ward action (integrated from GameIntelligence.Support)
+function AetherWeaver:GetWardAction(bot, gameTime)
+    local wards = {}
+    for i = 0, 14 do
+        local item = bot:GetItemInSlot(i)
+        if item then
+            local name = item:GetName()
+            if name == "item_ward_observer" then wards.observer = (wards.observer or 0) + 1 end
+            if name == "item_ward_sentry" then wards.sentry = (wards.sentry or 0) + 1 end
+        end
+    end
+    if (wards.observer or 0) == 0 and (wards.sentry or 0) == 0 then return nil end
+    
+    local team = bot:GetTeam() == DOTA_TEAM_GOODGUYS and "radiant" or "dire"
+    local spots = self.wardSpots[team]
+    if not spots then return nil end
+    
+    -- Early game: rune wards
+    if gameTime < 300 then
+        for _, spot in ipairs(spots) do
+            if spot.type == "observer" and spot.priority == "high" then
+                return spot
+            end
+        end
+    end
+    
+    -- Mid game: vision control
+    if gameTime < 1800 then
+        for _, spot in ipairs(spots) do
+            if spot.type == "observer" then
+                return spot
+            end
+        end
+    end
+    
+    -- Late game: deep wards / dewards
+    for _, spot in ipairs(spots) do
+        if spot.type == "sentry" then
+            return spot
+        end
+    end
+    
+    return nil
+end
+
+-- Ward spots per team
+AetherWeaver.wardSpots = {
+    radiant = {
+        -- Observer wards
+        {x = -2000, y = 2000, type = "observer", priority = "high", desc = "Top rune + river vision"},
+        {x = 2000, y = -2000, type = "observer", priority = "high", desc = "Bot rune + river vision"},
+        {x = -4000, y = 0, type = "observer", priority = "medium", desc = "Offlane defensive"},
+        {x = 0, y = 4000, type = "observer", priority = "medium", desc = "Safelane defensive"},
+        {x = -1000, y = -1000, type = "observer", priority = "high", desc = "Mid river control"},
+        {x = -5000, y = -3000, type = "observer", priority = "low", desc = "Enemy jungle deep"},
+        
+        -- Sentry wards
+        {x = -2000, y = 2000, type = "sentry", priority = "high", desc = "Deward top rune"},
+        {x = 2000, y = -2000, type = "sentry", priority = "high", desc = "Deward bot rune"},
+        {x = -1000, y = -1000, type = "sentry", priority = "medium", desc = "Deward mid river"},
+    },
+    dire = {
+        -- Mirror positions
+        {x = 2000, y = -2000, type = "observer", priority = "high", desc = "Top rune + river vision"},
+        {x = -2000, y = 2000, type = "observer", priority = "high", desc = "Bot rune + river vision"},
+        {x = 4000, y = 0, type = "observer", priority = "medium", desc = "Offlane defensive"},
+        {x = 0, y = -4000, type = "observer", priority = "medium", desc = "Safelane defensive"},
+        {x = 1000, y = 1000, type = "observer", priority = "high", desc = "Mid river control"},
+        {x = 5000, y = 3000, type = "observer", priority = "low", desc = "Enemy jungle deep"},
+        
+        {x = 2000, y = -2000, type = "sentry", priority = "high", desc = "Deward top rune"},
+        {x = -2000, y = 2000, type = "sentry", priority = "high", desc = "Deward bot rune"},
+        {x = 1000, y = 1000, type = "sentry", priority = "medium", desc = "Deward mid river"},
+    }
+}
     -- Check for missing enemies that have been missing for a while
     for i = 0, 9 do
         if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= bot:GetTeam() then

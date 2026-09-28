@@ -88,6 +88,7 @@ function RuneGeneric:GetBestRuneForBot(bot)
         local runeType = rune:GetRuneType()
         
         -- Skip if already assigned to another bot
+        local skip = false
         if self.assignedBots[spot] and self.assignedBots[spot] ~= bot then
             -- Check if assigned bot is too far or dead
             local assigned = self.assignedBots[spot]
@@ -95,34 +96,34 @@ function RuneGeneric:GetBestRuneForBot(bot)
                (assigned:GetLocation() - rune:GetLocation()):Length2D() > 3000 then
                 self.assignedBots[spot] = nil
             else
-                goto continue
+                skip = true
             end
         end
         
-        -- Power rune logic
-        if runeType == RUNE_DOUBLEDAMAGE or runeType == RUNE_HASTE or 
-           runeType == RUNE_ILLUSION or runeType == RUNE_REGENERATION or 
-           runeType == RUNE_ARCANE then
-            if isMid or isPowerRuneTime then
-                return runeInfo
+        if not skip then
+            -- Power rune logic
+            if runeType == RUNE_DOUBLEDAMAGE or runeType == RUNE_HASTE or 
+               runeType == RUNE_ILLUSION or runeType == RUNE_REGENERATION or 
+               runeType == RUNE_ARCANE then
+                if isMid or isPowerRuneTime then
+                    return runeInfo
+                end
+            end
+            
+            -- Bounty rune logic - distribute among team
+            if runeType == RUNE_BOUNTY then
+                if not isMid then -- Non-mid get priority for bounty
+                    return runeInfo
+                end
+            end
+            
+            -- Wisdom rune - contest if ahead or need levels
+            if runeType == RUNE_WISDOM then
+                if isWisdomTime and bot:GetLevel() < 25 then
+                    return runeInfo
+                end
             end
         end
-        
-        -- Bounty rune logic - distribute among team
-        if runeType == RUNE_BOUNTY then
-            if not isMid then -- Non-mid get priority for bounty
-                return runeInfo
-            end
-        end
-        
-        -- Wisdom rune - contest if ahead or need levels
-        if runeType == RUNE_WISDOM then
-            if isWisdomTime and bot:GetLevel() < 25 then
-                return runeInfo
-            end
-        end
-        
-        ::continue::
     end
     
     -- Fallback: closest unassigned rune
