@@ -942,6 +942,9 @@ AetherWeaver.wardSpots = {
         {x = 1000, y = 1000, type = "sentry", priority = "medium", desc = "Deward mid river"},
     }
 }
+
+-- Communicate missing enemies and assist requests
+function AetherWeaver:CommunicateMissingAndAssist(bot, gameTime)
     -- Check for missing enemies that have been missing for a while
     for i = 0, 9 do
         if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= bot:GetTeam() then
