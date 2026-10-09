@@ -10,38 +10,108 @@
 
 local ItemPurchase = {}
 
--- Cheapest first, so a freshly spawned bot still spends its starting gold.
-ItemPurchase.STARTERS = {
-    support = { "item_tango", "item_ward_observer", "item_fairy_flare" },
-    mid     = { "item_tango", "item_null_talisman", "item_fairy_flare" },
-    offlane = { "item_tango", "item_branches", "item_fairy_flare" },
-    carry   = { "item_tango", "item_fairy_flare", "item_branches" },
+-- Buy order by role, cheapest first. Each entry is
+--   { item, minGold, shop }  where shop is "home", "side" or "secret".
+-- Home = fountain, side = side shop, secret = secret shop.
+-- Costs are the vanilla values and drift per patch; the minGold gate means a
+-- wrong number only delays a purchase, it never causes a crash.
+ItemPurchase.BUILDS = {
+    support = {
+        { "item_tango",         90,  "home"   },
+        { "item_ward_observer", 50,  "home"   },
+        { "item_tango",         90,  "home"   },
+        { "item_fairy_flare",   180, "home"   },
+        { "item_ward_sentry",   50,  "home"   },
+        { "item_medallion_of_courage", 400, "side" },
+        { "item_ghost_scepter", 1500, "side" },
+        { "item_aghanims_scepter", 4200, "secret" },
+        { "item_ward_dispensary", 900, "side" },
+    },
+    mid = {
+        { "item_tango",         90,  "home"   },
+        { "item_tango",         90,  "home"   },
+        { "item_null_talisman", 40,  "home"   },
+        { "item_fairy_flare",   180, "home"   },
+        { "item_blink",         2250, "side"  },
+        { "item_sheepstick",    1800, "side"  },
+        { "item_aghanims_scepter", 4200, "secret" },
+    },
+    offlane = {
+        { "item_tango",         90,  "home"   },
+        { "item_tango",         90,  "home"   },
+        { "item_branches",      90,  "home"   },
+        { "item_fairy_flare",   180, "home"   },
+        { "item_blink",         2250, "side"  },
+        { "item_bravado",       1800, "side"  },
+        { "item_aghanims_scepter", 4200, "secret" },
+    },
+    carry = {
+        { "item_tango",         90,  "home"   },
+        { "item_fairy_flare",   180, "home"   },
+        { "item_tango",         90,  "home"   },
+        { "item_branches",      90,  "home"   },
+        { "item_power_treads",  1400, "side"   },
+        { "item_butterfly",     2100, "side"   },
+        { "item_monster_breaker_135", 3300, "side" },
+        { "item_aghanims_scepter", 4200, "secret" },
+    },
 }
 
-local function NormalizeRole(role)
+-- Secret shop items can only be bought when standing at it; keep the mapping
+-- explicit so a wrong answer is a skipped purchase, not an error.
+local function AtShop(bot, shop)
+    if shop == "home" then return bot:DistanceFromFountain() == 0 end
+    if shop == "side" then return bot:DistanceFromSideShop() == 0 end
+    if shop == "secret" then return bot:DistanceFromSecretShop() == 0 end
+    return false
+end
+
+-- Exported: mode_item_generic.lua needs it to read the same build order.
+function ItemPurchase.NormalizeRole(role)
     if role == "support" or role == "mid" or role == "offlane" or role == "carry" then
         return role
     end
     return "carry"
 end
 
--- Buy one starter item if we stand in fountain range and can afford it.
+local NormalizeRole = ItemPurchase.NormalizeRole
+
+-- Buy the first affordable, reachable, not-yet-owned item in the build order.
 -- ActionImmediate_PurchaseItem returns a PURCHASE_ITEM_* code, so a failure
 -- (wrong shop, wrong gold, item unavailable) is a no-op rather than a crash.
 function ItemPurchase:PurchaseItem(bot)
     if not bot or bot:IsNull() then return false end
 
     -- Nothing to spend.
-    if bot:GetGold() <= 0 then return false end
+    local gold = bot:GetGold()
+    if gold <= 0 then return false end
 
-    -- Must physically be at a shop or the purchase silently does nothing.
-    if bot:DistanceFromFountain() ~= 0 then return false end
+    local build = self.BUILDS[NormalizeRole(bot:GetRole())]
+    for _, entry in ipairs(build) do
+        local item, minGold, shop = entry[1], entry[2], entry[3]
+        -- Must be standing at that shop; elsewhere the purchase silently fails.
+        if gold >= minGold and not bot:HasItem(item) and AtShop(bot, shop) then
+            if bot:ActionImmediate_PurchaseItem(item) == PURCHASE_ITEM_SUCCESS then
+                return true
+            end
+        end
+    end
+    return false
+end
 
-    local list = self.STARTERS[NormalizeRole(bot:GetRole())]
-    for i = 1, #list do
-        local item = list[i]
-        if not bot:HasItem(item) and bot:ActionImmediate_PurchaseItem(item) == PURCHASE_ITEM_SUCCESS then
-            return true
+-- True when the bot can afford its next item but is not standing at the shop
+-- that sells it. The mode files use this to stop competing with Valve's own
+-- shopping behaviour, otherwise a bot mid-lane never walks back to buy.
+function ItemPurchase:NeedsToShop(bot)
+    if not bot or bot:IsNull() then return false end
+    local gold = bot:GetGold()
+    if gold <= 0 then return false end
+
+    local build = self.BUILDS[NormalizeRole(bot:GetRole())]
+    for _, entry in ipairs(build) do
+        local item, minGold, shop = entry[1], entry[2], entry[3]
+        if gold >= minGold and not bot:HasItem(item) then
+            return not AtShop(bot, shop)
         end
     end
     return false

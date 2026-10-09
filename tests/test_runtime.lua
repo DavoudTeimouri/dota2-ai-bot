@@ -254,6 +254,10 @@ do
         "mode_farm_generic",
         "mode_ward_generic",
         "mode_rune_generic",
+        "mode_item_generic",
+        "mode_retreat_generic",
+        "mode_team_roam_generic",
+        "mode_push_lane_generic",
     }
     for _, name in ipairs(modes) do
         local path = "vscripts/bots/" .. name .. ".lua"
@@ -293,6 +297,76 @@ do
         and not requires["game_intelligence_extended"]
         and not requires["human_kill_taunts"],
         "still requires a deleted module")
+end
+
+-- ---- Item build progression ------------------------------------------------
+do
+    local ItemPurchase = require("item_purchase_generic")
+
+    -- A rich carry at fountain should get past the cheap starters.
+    local rich = {
+        IsNull = function() return false end,
+        GetGold = function() return 6000 end,
+        GetRole = function() return "carry" end,
+        HasItem = function() return false end,
+        DistanceFromFountain = function() return 0 end,
+        DistanceFromSideShop = function() return 900 end,
+        DistanceFromSecretShop = function() return 900 end,
+        ActionImmediate_PurchaseItem = function() return PURCHASE_ITEM_SUCCESS end,
+    }
+    check("carry buys at fountain with 6000 gold",
+        ItemPurchase:PurchaseItem(rich) == true)
+
+    -- Nowhere near a shop: nothing may be bought.
+    local away = {}
+    for k, v in pairs(rich) do away[k] = v end
+    away.DistanceFromFountain = function() return 5000 end
+    check("carry buys nothing away from every shop",
+        ItemPurchase:PurchaseItem(away) == false)
+
+    -- NeedsToShop drives mode_item_generic: true when rich but not at a shop.
+    check("NeedsToShop true when rich and away from shops",
+        ItemPurchase:NeedsToShop(away) == true)
+
+    -- Poor bot has nothing affordable, so no shopping trip is needed.
+    local poor = {}
+    for k, v in pairs(rich) do poor[k] = v end
+    poor.GetGold = function() return 10 end
+    check("NeedsToShop false when it cannot afford the next item",
+        ItemPurchase:NeedsToShop(poor) == false)
+
+    -- Every build must name a real shop we know how to walk to.
+    local shops = { home = true, side = true, secret = true }
+    for role, build in pairs(ItemPurchase.BUILDS) do
+        for _, entry in ipairs(build) do
+            check(role .. " build entry " .. entry[1] .. " has a known shop",
+                shops[entry[3]] == true, "unknown shop " .. tostring(entry[3]))
+            check(role .. " build entry " .. entry[1] .. " has a positive cost",
+                type(entry[2]) == "number" and entry[2] > 0)
+        end
+    end
+end
+
+-- ---- Per-hero override files must live at the bot root ----------------------
+do
+    -- The engine loads ability_item_usage_[hero].lua from vscripts/bots/, not
+    -- from a Customize/ subdirectory. The old Customize/hero/antimage files
+    -- were data tables nothing ever loaded.
+    local path = "vscripts/bots/ability_item_usage_antimage.lua"
+    local f = io.open(path)
+    check("ability_item_usage_antimage.lua exists at the bot root", f ~= nil)
+    if f then f:close() end
+
+    local src = io.open(path):read("*a")
+    check("per-hero file defines AbilityUsageThink()",
+        src:find("function AbilityUsageThink") ~= nil)
+    check("per-hero file returns a module table",
+        src:find("return AM") ~= nil)
+
+    -- The dead Customize directory must stay gone.
+    local customize = io.open("vscripts/bots/Customize/hero/antimage.lua")
+    check("Customize/ directory removed", customize == nil)
+    if customize then customize:close() end
 end
 
 if failures == 0 then
