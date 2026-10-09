@@ -26,15 +26,15 @@ local desireState = {
 }
 
 -- Get current game time
+-- DotaTime() is the bot VM's clock; GameRules is nil here, so fall back so the
+-- offline test harness (no DotaTime either) reports 0 rather than crashing.
 local function GetGameTime()
-    return GameRules:GetGameTime()
+    if DotaTime then return DotaTime() end
+    return 0
 end
 
--- Check if turbo mode
+-- Check if turbo mode. Turbo is not exposed to bot scripts; never enabled.
 local function IsTurboMode()
-    if GameRules.IsTurbo then
-        return GameRules:IsTurbo()
-    end
     return false
 end
 
@@ -512,6 +512,19 @@ function TeamDesires:Think()
     
     -- Update desires
     UpdateDesires()
+end
+
+-- Engine hook. team_desires.lua is where the engine calls TeamThink() once per
+-- frame, so this is the only reliably-ticked per-frame entry point. It drives
+-- AetherWeaver's periodic work (naming already happens in hero_selection).
+function TeamThink()
+    local bot = GetBot()
+    if bot and not bot:IsNull() then
+        local AetherWeaver = require("init")
+        AetherWeaver.hero = bot
+        AetherWeaver:BotThink()
+    end
+    TeamDesires:Think()
 end
 
 -- Export desire types for external use

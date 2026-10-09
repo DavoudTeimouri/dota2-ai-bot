@@ -17,6 +17,13 @@ HumanKillTaunts.Config = {
     DEBUG_MODE = false,             -- enable debug prints
 }
 
+-- Team constants. These exist in the game VM, but not in the offline test
+-- harness, so fall back to the documented values. Using them as table keys at
+-- load time with a nil constant raised "table index is nil" and aborted the
+-- whole require chain.
+local TEAM_RADIANT = DOTA_TEAM_GOODGUYS or 2
+local TEAM_DIRE = DOTA_TEAM_BADGUYS or 3
+
 -- ============================================================================
 -- STATE TRACKING
 -- ============================================================================
@@ -29,8 +36,8 @@ HumanKillTaunts.State = {
     gamePausedUntil = 0,            -- gameTime when pause should end
     pauseActive = false,
     teamNetWorth = {                -- [team] = total net worth
-        [DOTA_TEAM_GOODGUYS] = 0,
-        [DOTA_TEAM_BADGUYS] = 0,
+        [TEAM_RADIANT] = 0,
+        [TEAM_DIRE] = 0,
     },
     lastNetWorthUpdate = 0,
 }
@@ -227,7 +234,7 @@ function HumanKillTaunts:UpdateTeamNetWorth()
             local hero = PlayerResource:GetSelectedHeroEntity(i)
             if hero and not hero:IsNull() then
                 local nw = hero:GetNetWorth()
-                if PlayerResource:GetTeam(i) == DOTA_TEAM_GOODGUYS then
+                if PlayerResource:GetTeam(i) == TEAM_RADIANT then
                     radiantNW = radiantNW + nw
                 else
                     direNW = direNW + nw
@@ -236,14 +243,14 @@ function HumanKillTaunts:UpdateTeamNetWorth()
         end
     end
 
-    self.State.teamNetWorth[DOTA_TEAM_GOODGUYS] = radiantNW
-    self.State.teamNetWorth[DOTA_TEAM_BADGUYS] = direNW
+    self.State.teamNetWorth[TEAM_RADIANT] = radiantNW
+    self.State.teamNetWorth[TEAM_DIRE] = direNW
 end
 
 function HumanKillTaunts:IsComebackSituation(botTeam)
     self:UpdateTeamNetWorth()
     local ourNW = self.State.teamNetWorth[botTeam]
-    local enemyTeam = (botTeam == DOTA_TEAM_GOODGUYS) and DOTA_TEAM_BADGUYS or DOTA_TEAM_GOODGUYS
+    local enemyTeam = (botTeam == TEAM_RADIANT) and TEAM_DIRE or TEAM_RADIANT
     local enemyNW = self.State.teamNetWorth[enemyTeam]
     
     return (enemyNW - ourNW) > self.Config.COMEBACK_GOLD_DEFICIT
@@ -523,7 +530,7 @@ function HumanKillTaunts:TrackHumanKillStreaks(gameTime)
     end
     if not botTeam then return end
     
-    local enemyTeam = (botTeam == DOTA_TEAM_GOODGUYS) and DOTA_TEAM_BADGUYS or DOTA_TEAM_GOODGUYS
+    local enemyTeam = (botTeam == TEAM_RADIANT) and TEAM_DIRE or TEAM_RADIANT
     
     for i = 0, 9 do
         if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) == enemyTeam then
@@ -548,8 +555,8 @@ function HumanKillTaunts:Reset()
     self.State.gamePausedUntil = 0
     self.State.pauseActive = false
     self.State.teamNetWorth = {
-        [DOTA_TEAM_GOODGUYS] = 0,
-        [DOTA_TEAM_BADGUYS] = 0,
+        [TEAM_RADIANT] = 0,
+        [TEAM_DIRE] = 0,
     }
     self.State.lastNetWorthUpdate = 0
     self:DebugPrint("State reset")

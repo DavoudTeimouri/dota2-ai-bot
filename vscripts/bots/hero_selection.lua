@@ -276,6 +276,17 @@ function HeroSelection:GetBanRecommendations(enemyPicks, bannedHeroes)
 end
 
 -- Main Think function called by Dota 2 during pick/ban phase
+-- Set the custom bot name exactly once per bot, and keep it across respawns.
+local named = {}
+
+local function EnsureBotName(bot)
+    if not bot or bot:IsNull() then return end
+    if named[bot] then return end
+    named[bot] = true
+    local BotNames = require("bot_names")
+    BotNames:SetBotName(bot, bot:GetTeam())
+end
+
 function HeroSelection:Think()
     -- Initialize on first call
     if not phaseState.initialized then
@@ -283,13 +294,22 @@ function HeroSelection:Think()
         print("[HeroSelection] Initialized")
     end
     
+    local bot = GetBot()
+    if not bot or bot:IsNull() then return end
+
+    -- Naming works in every game phase, so do it before the pick/ban checks.
+    EnsureBotName(bot)
+
+    -- GameRules is nil in the bot script VM, so there is no way to read the
+    -- game state here. Returning is the safe default: Valve's own hero
+    -- selection runs instead of crashing this file.
+    if not GameRules then return end
+    if GameRules.State_Get == nil then return end
+    
     local gameState = GameRules:State_Get()
     if gameState ~= DOTA_GAMERULES_STATE_HERO_SELECTION then
         return
     end
-    
-    local bot = GetBot()
-    if not bot or bot:IsNull() then return end
     
     local playerID = bot:GetPlayerID()
     if playerID < 0 or playerID > 9 then return end
@@ -358,6 +378,12 @@ function HeroSelection:Think()
             print("[HeroSelection] Picked: " .. pick)
         end
     end
+end
+
+-- Engine hook. hero_selection.lua is the file the engine calls Think() in, so
+-- the global MUST exist here -- a method on the module table is never reached.
+function Think()
+    HeroSelection:Think()
 end
 
 -- Export for use by init.lua

@@ -567,34 +567,19 @@ function AetherWeaver:BotThink()
         MaybeSay(msg)
         
         -- Periodic messages with variety
-        Timers:CreateTimer(15.0, function()
-            local categories = {"funny_lines", "self_deprecating", "tactical_alerts", "chat_wheel"}
-            local cat = categories[math.random(#categories)]
-            local msg = AetherWeaverMessages.get_random(cat)
-            if msg then MaybeSay(msg) end
-            return 15.0
-        end)
-        
+        -- (replaced Timers:CreateTimer(15.0) -- see AetherWeaver:RunPeriodic)
+
         -- Contextual time-based messages
-        Timers:CreateTimer(60.0, function()
-            local gameTime = DotaTime()
-            local mins = math.floor(gameTime / 60)
-            local key = string.format("min_%d", mins)
-            local msg = AetherWeaverMessages.get_contextual(key)
-            if msg then MaybeSay(msg) end
-            return 60.0
-        end)
-        
+        -- (replaced Timers:CreateTimer(60.0))
+
         -- Game intelligence: periodic decision making
-        Timers:CreateTimer(1.0, function()
-            if self.hero and not self.hero:IsNull() then
-                self:MakeGameDecisions()
-                -- Update team desires
-                TeamDesires:Think()
-            end
-            return 1.0
-        end)
+        -- (replaced Timers:CreateTimer(1.0))
     end
+    
+    -- Timers:CreateTimer does not exist in the bot script VM (Timers is nil
+    -- there and the shim could only reach GameRules, which is nil too).
+    -- Run the same work off a plain DotaTime() diff instead.
+    self:RunPeriodic()
     
     -- Call HeroSelection Think for pick/ban phase
     HeroSelection:Think()
@@ -602,6 +587,38 @@ function AetherWeaver:BotThink()
     -- Call RuneGeneric Think
     if self.hero and not self.hero:IsNull() then
         RuneGeneric:Think(self.hero)
+    end
+end
+
+-- Elapsed-time throttle standing in for the three Timers:CreateTimer calls.
+-- nextX is the game time at which each job is next due; 0 means "run now".
+function AetherWeaver:RunPeriodic()
+    local now = DotaTime()
+    -- Before the horn DotaTime() is negative and counts up; clamp so the
+    -- first run does not fire every frame during the strategy phase.
+    if now < 0 then return end
+
+    if now >= self.nextDecision then
+        self.nextDecision = now + 1.0
+        if self.hero and not self.hero:IsNull() then
+            self:MakeGameDecisions()
+        end
+        TeamDesires:Think()
+    end
+
+    if now >= self.nextChatter then
+        self.nextChatter = now + 15.0
+        local categories = { "funny_lines", "self_deprecating", "tactical_alerts", "chat_wheel" }
+        local cat = categories[math.random(#categories)]
+        local msg = AetherWeaverMessages.get_random(cat)
+        if msg then MaybeSay(msg) end
+    end
+
+    if now >= self.nextContextual then
+        self.nextContextual = now + 60.0
+        local mins = math.floor(now / 60)
+        local msg = AetherWeaverMessages.get_contextual(string.format("min_%d", mins))
+        if msg then MaybeSay(msg) end
     end
 end
 
@@ -660,9 +677,11 @@ function AetherWeaver:MakeGameDecisions()
     local ability, target = AbilityUsage:GetAbilityUsage(bot)
     if ability and target then
         if type(target) == "userdata" and target.IsAlive and target:IsAlive() then
-            bot:ActionUseAbilityOnEntity(ability, target)
+            bot:Action_UseAbilityOnEntity(ability, target)
         elseif type(target) == "table" and target.x and target.y and target.z then
-            bot:ActionUseAbilityOnLocation(ability, target)
+            bot:Action_UseAbilityOnLocation(ability, target)
+        else
+            bot:Action_UseAbility(ability)
         end
     end
     
@@ -681,7 +700,7 @@ function AetherWeaver:MakeGameDecisions()
                 end
             end
             if wardItem then
-                bot:ActionUseAbilityOnLocation(wardItem, Vector(wardAction.x, wardAction.y, 0))
+                bot:Action_UseAbilityOnLocation(wardItem, Vector(wardAction.x, wardAction.y, 0))
             end
         end
         
@@ -743,7 +762,7 @@ function AetherWeaver:MakeGameDecisions()
             local abilities = GameIntelligence.TeamFight:GetAbilityUsage(bot, target)
             for _, abil in ipairs(abilities) do
                 if abil:IsFullyCastable() then
-                    bot:CastAbilityOnTarget(target, abil)
+                    bot:Action_UseAbilityOnEntity(abil, target)
                     break
                 end
             end
@@ -956,16 +975,9 @@ function Activate()
 end
 
 -- Make sure Timers library is available (Dota 2 provides it in addon context)
-if not Timers then
-    Timers = {}
-    function Timers:CreateTimer(delay, callback)
-        local thinkName = "AetherWeaverTimer" .. math.random(1000000)
-        GameRules:GetGameModeEntity():SetThink(function()
-            local result = callback()
-            if result then return result end
-            return nil
-        end, thinkName, delay)
-    end
-end
+-- Timers is nil in the bot script VM, and the previous shim could only reach
+-- GameRules (also nil), so it raised on the first CreateTimer call. All three
+-- call sites are gone; periodic work runs from AetherWeaver:RunPeriodic().
+local Timers = nil
 
 return AetherWeaver

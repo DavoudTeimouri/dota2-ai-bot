@@ -75,12 +75,21 @@ BotNames.spanish = {
 }
 
 -- All names combined
+-- NOTE: iterate a snapshot of the language keys. Iterating BotNames directly
+-- while inserting into BotNames.all re-hashes the table and the loop keeps
+-- hitting the still-growing `all` key forever -- bot_names.lua never finished
+-- loading, which hung init.lua and left every bot frozen.
+local languages = {}
+for key, list in pairs(BotNames) do
+    if key ~= "all" and type(list) == "table" then
+        languages[#languages + 1] = list
+    end
+end
+
 BotNames.all = {}
-for _, list in pairs(BotNames) do
-    if type(list) == "table" then
-        for _, name in ipairs(list) do
-            table.insert(BotNames.all, name)
-        end
+for _, list in ipairs(languages) do
+    for _, name in ipairs(list) do
+        BotNames.all[#BotNames.all + 1] = name
     end
 end
 
