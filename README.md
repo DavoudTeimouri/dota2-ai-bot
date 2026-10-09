@@ -6,22 +6,30 @@
 A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messages, hints to human players, and works as a team worker. No external dependencies — pure Lua Workshop addon.
 
 ## Features
-- **Hero Selection**: Waits for human picks, then fills missing role and counters enemy lineup
-- **Lane Assignment**: Assigns lane based on hero role (carry→safe, mid→mid, offlaner→offlane, support→jungle/rune) with dynamic priority using hero matchup and missing enemy data
-- **Hero Override System**: Per‑hero item builds, skill builds, and ability usage logic via `Customize/hero/<hero_name>/`
-- **Adaptive Items**: Item builds adjust to enemy team composition (magic/physical damage, disables, healing)
-- **Teamfight Positioning**: Evaluates enemy threat and suggests safe retreat zones behind allies and towers
-- **Communication Pings**: Automatic missing‑enemy alerts and assist requests based on game state
-- **Vision Control**: Optimal ward placement considering rune times, gank paths, and depth
-- **Behavioral Variance**: Occasional randomness to avoid predictability
-- **Mode‑Based Logic**: Example farm mode (`mode_farm_generic.lua`) for clean state‑based behavior
-- **Phased Strategies**: Early farm/deny → mid‑game gank & tower pressure → late‑game Roshan & team fights
-- **Teamwork**: Shares vision hints, calls missing enemies, coordinates smoke ganks, buys courier upgrades, pulls/stacks jungle, heals/shields allies
-- **Team Fight**: Prioritizes targets (squishy > disable > carry), uses ability combos, positions safely, initiates/disengages as needed
-- **Supporting**: Buys wards, smoke, dust; pulls creep, stacks jungle; uses heal/shield items/abilities on allies
-- **Communicating & Guiding**: Sends contextual, funny, weighted chat messages and chat‑wheel hints
-- **Accept Human Orders**: Parses `!push <lane>`, `!roshan`, `!ward`, `!lane <lane>` in all‑chat and executes requested action
-- **Chat Wheels & Sprays**: Custom wheel slots for frequent hints; spray triggers on first blood, tower kill, Roshan kill
+- **Hero Selection**: Waits for human picks, then fills missing role and counters enemy lineup (falls back to POSITION_HEROES when GameRules unavailable).
+- **Lane Assignment**: Assigns lane based on hero role with dynamic priority; can swap lanes when safer.
+- **Per‑Hero Overrides**: Hero‑specific item builds, skill builds, and ability usage via `ability_item_usage_<hero>.lua` and `item_purchase_<hero>.lua` at the bot root.
+- **Adaptive Items**: Full role‑based build order (starter → core → luxury) with shop gating (home/side/secret) and minGold thresholds.
+- **Teamfight Positioning**: Simple retreat to nearest ally/tower when low HP and outnumbered.
+- **Communication Pings**: Automatic missing‑enemy alerts and assist requests based on game state.
+- **Vision Control**: Optimal ward placement considering rune times, gank paths, and depth (via `mode_ward_generic.lua`).
+- **Behavioral Variance**: Occasional randomness to avoid predictability.
+- **Mode‑Based Logic**: Eight modes that compete via GetDesire():
+  - `mode_laning_generic.lua` – hold lane, last hit, do not feed
+  - `mode_farm_generic.lua` – jungle and lane farming when laning is weak
+  - `mode_ward_generic.lua` – place wards when safe
+  - `mode_rune_generic.lua` – contest power runes around spawn windows
+  - `mode_item_generic.lua` – walk to shop when next item is affordable
+  - `mode_push_lane_generic.lua` – push lane with wave and numbers advantage
+  - `mode_retreat_generic.lua` – disengage when low and outnumbered
+  - `mode_team_roam_generic.lua` – join allied fights, focus fire
+- **Phased Strategies**: Early farm/deny → mid‑game gank & tower pressure → late‑game Roshan & team fights.
+- **Teamwork**: Shares vision hints, calls missing enemies, coordinates smoke ganks, buys courier upgrades, pulls/stacks jungle, heals/shields allies.
+- **Team Fight**: Prioritizes targets (squishy > disable > carry), uses ability combos, positions safely, initiates/disengages as needed.
+- **Supporting**: Buys wards, smoke, dust; pulls creep, stacks jungle; uses heal/shield items/abilities on allies.
+- **Communicating & Guiding**: Sends contextual, funny, weighted chat messages and chat‑wheel hints.
+- **Accept Human Orders**: Parses `!push <lane>`, `!roshan`, `!ward`, `!lane <lane>` in all‑chat and executes requested action.
+- **Chat Wheels & Sprays**: Custom wheel slots for frequent hints; spray triggers on first blood, tower kill, Roshan kill.
 
 ## Bot Name
 **AetherWeaver**
