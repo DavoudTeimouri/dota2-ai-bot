@@ -1,75 +1,84 @@
--- Farm mode: decide what to do when farming
-local FarmModeGeneric = {}
+-- Farm mode: jungle and lane farming once laning stops being worth it.
+--
+-- Engine contract: GetDesire() is called EVERY FRAME for every mode file. The
+-- highest desire wins and that mode's Think() runs. nil falls back to Valve's
+-- built-in desire; 0 opts out entirely.
+--
+-- The previous version defined only a module method and a global
+-- GetFarmAction(), neither of which the engine ever calls, so this mode could
+-- never activate.
+local function NeutralTier(name)
+    if name:find("ancient") then return 4 end
+    if name:find("large") then return 3 end
+    if name:find("medium") then return 2 end
+    return 1
+end
 
--- Farm action types
-FarmModeGeneric.ACTION_TYPES = {
-    ATTACK = "attack",
-    MOVE_TO_LANE = "move_to_lane",
-    MOVE_TO_CAMP = "move_to_camp",
-    WAIT = "wait",
-}
+function GetDesire()
+    local bot = GetBot()
+    if not bot or bot:IsNull() or not bot:IsAlive() then return 0 end
 
--- Get farm action for bot
-function FarmModeGeneric:GetFarmAction(bot, gameTime)
-    if not bot or bot:IsNull() then return { type = self.ACTION_TYPES.WAIT } end
-    
-    -- Check for nearby enemy creeps (lane farming)
+    -- Low HP: retreat should win, not a neutral camp.
+    if bot:GetHealth() < bot:GetMaxHealth() * 0.4 then return 0 end
+
+    -- Farming is the fallback: low desire, so laning and warding take priority.
+    local desire = 0.25
+
+    -- Early on the lane is the better place to be.
+    if DotaTime() < 600 then desire = 0.15 end
+
+    -- Carries want farm time more than supports do.
+    local role = bot:GetRole()
+    if role == "carry" then desire = desire + 0.1
+    elseif role == "support" then desire = desire - 0.1 end
+
+    -- Nothing nearby to hit: farming has no target, let another mode run.
+    if not bot.GetNearbyNeutralCamps then return nil end
+    if #bot:GetNearbyNeutralCamps(1500) == 0 then return 0 end
+
+    return desire
+end
+
+function Think()
+    local bot = GetBot()
+    if not bot or bot:IsNull() or not bot:IsAlive() then return end
+
+    -- Neutral camps first: highest tier available.
+    local neutrals = bot:GetNearbyNeutralCamps(1500)
+    if #neutrals > 0 then
+        local best, bestTier = nil, 0
+        for _, creep in ipairs(neutrals) do
+            local tier = NeutralTier(creep:GetUnitName())
+            if tier > bestTier then
+                best, bestTier = creep, tier
+            end
+        end
+        if best then
+            bot:AttackTarget(best)
+            return
+        end
+    end
+
+    -- No neutrals: farm the lane wave, last-hitting.
     local laneCreeps = bot:GetNearbyLaneCreeps(800, true)
     if #laneCreeps > 0 then
-        -- Find lowest HP creep to last hit
-        local bestCreep = nil
-        local lowestHP = math.huge
+        local best, lowest = nil, math.huge
         for _, creep in ipairs(laneCreeps) do
-            if creep:GetHealth() < lowestHP and creep:GetHealth() <= bot:GetAttackDamage() * 1.5 then
-                lowestHP = creep:GetHealth()
-                bestCreep = creep
+            local hp = creep:GetHealth()
+            if hp < lowest and hp <= bot:GetAttackDamage() then
+                best, lowest = creep, hp
             end
         end
-        if bestCreep then
-            return { type = self.ACTION_TYPES.ATTACK, target = bestCreep }
-        end
-        
-        -- Attack any creep if no last hit available
-        return { type = self.ACTION_TYPES.ATTACK, target = laneCreeps[1] }
-    end
-    
-    -- Check for neutral camps
-    local neutrals = bot:GetNearbyNeutralCreeps(800)
-    if #neutrals > 0 then
-        -- Prioritize ancients > large > medium > small
-        local bestCamp = nil
-        local bestScore = 0
-        for _, creep in ipairs(neutrals) do
-            local score = 0
-            local name = creep:GetUnitName()
-            if name:find("ancient") then score = 100
-            elseif name:find("large") then score = 80
-            elseif name:find("medium") then score = 60
-            elseif name:find("small") then score = 40 end
-            
-            if score > bestScore then
-                bestScore = score
-                bestCamp = creep
-            end
-        end
-        if bestCamp then
-            return { type = self.ACTION_TYPES.ATTACK, target = bestCamp }
+        if best then
+            bot:AttackTarget(best)
+            return
         end
     end
-    
-    -- No farm targets - move to assigned lane
+
+    -- Nothing to hit anywhere: hold the lane front.
     local lane = bot:GetAssignedLane() or "safe"
-    local laneFront = GetLaneFrontLocation(GetTeam(), lane, 0)
-    if laneFront then
-        return { type = self.ACTION_TYPES.MOVE_TO_LANE, target = laneFront }
+    local pos = GetLaneFrontLocation(GetTeam(), lane, 0)
+    if pos then
+        bot:Action_AttackMove(pos)
     end
-    
-    return { type = self.ACTION_TYPES.WAIT }
 end
-
--- Engine hook (optional - can be called from init.lua)
-function GetFarmAction(bot, gameTime)
-    return FarmModeGeneric:GetFarmAction(bot, gameTime)
-end
-
-return FarmModeGeneric

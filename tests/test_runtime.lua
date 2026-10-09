@@ -235,13 +235,64 @@ end
 do
     for _, name in ipairs({
         "item_purchase_generic", "ability_item_usage_generic",
-        "skill_build_generic", "courier_generic", "rune_generic",
-        "bot_names", "team_desires", "mode_farm_generic",
+        "skill_build_generic", "courier_generic",
+        "bot_names", "team_desires",
     }) do
         local mod = require(name)
         check(name .. ": require() yields a table", type(mod) == "table",
             "got " .. type(mod))
     end
+end
+
+-- ---- Mode files must expose the engine's mode contract --------------------
+do
+    -- GetDesire() is called every frame for EVERY mode file; the highest wins.
+    -- A mode with no GetDesire() can never activate, which is what the old
+    -- mode_farm_generic.lua did.
+    local modes = {
+        "mode_laning_generic",
+        "mode_farm_generic",
+        "mode_ward_generic",
+        "mode_rune_generic",
+    }
+    for _, name in ipairs(modes) do
+        local path = "vscripts/bots/" .. name .. ".lua"
+        _G.GetDesire, _G.Think, _G.OnStart, _G.OnEnd = nil, nil, nil, nil
+        dofile(path)
+        check(name .. ": defines global GetDesire()",
+            type(_G.GetDesire) == "function")
+        check(name .. ": defines global Think()",
+            type(_G.Think) == "function")
+
+        -- GetDesire must return nil or a number, never throw and never a bool.
+        local ok, val = pcall(_G.GetDesire)
+        check(name .. ": GetDesire() is safe with no bot",
+            ok and (val == nil or type(val) == "number"),
+            ok and ("returned " .. type(val)) or tostring(val))
+    end
+end
+
+-- ---- Deleted modules must stay deleted -------------------------------------
+do
+    -- These need PlayerResource/GameRules, which are nil in the bot VM.
+    for _, name in ipairs({
+        "game_intelligence", "game_intelligence_extended", "human_kill_taunts",
+    }) do
+        local loaded = pcall(require, name)
+        check(name .. ": removed (not required by init)", loaded == false)
+    end
+
+    -- Nothing may still require a deleted file (comments naming them are fine).
+    local init_src = io.open("vscripts/bots/init.lua"):read("*a")
+    local requires = {}
+    for name in init_src:gmatch('require%("([^"]+)"%)') do
+        requires[name] = true
+    end
+    check("init.lua requires no deleted module",
+        not requires["game_intelligence"]
+        and not requires["game_intelligence_extended"]
+        and not requires["human_kill_taunts"],
+        "still requires a deleted module")
 end
 
 if failures == 0 then

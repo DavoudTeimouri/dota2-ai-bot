@@ -1,21 +1,11 @@
 -- AetherWeaver Dota 2 Bot
 -- Workshop addon: vscripts/bots/init.lua
-
--- Module table
-local AetherWeaver = {}
-
--- ============================================================================
--- LOAD MODULES
--- ============================================================================
-local GameIntelligence = require("game_intelligence")
-local GameIntelligenceExtended = require("game_intelligence_extended")
-local HeroSelection = require("hero_selection")
-local TeamDesires = require("team_desires")
-local BotNames = require("bot_names")
-local ItemPurchase = require("item_purchase_generic")
-local AbilityUsage = require("ability_item_usage_generic")
-local HumanKillTaunts = require("human_kill_taunts")
-local RuneGeneric = require("rune_generic")
+--
+-- Loaded from team_desires.lua's TeamThink(), the once-per-frame hook the
+-- engine guarantees. Behaviour itself lives in the mode files
+-- (mode_laning/farm/ward/rune_generic.lua) and the item/ability hooks
+-- (item_purchase_generic.lua, ability_item_usage_generic.lua); this file owns
+-- the message library and per-bot lane upkeep only.
 
 -- ============================================================================
 -- EXPANDED MESSAGE LIBRARY (from Whimsy Injector specialist)
@@ -455,529 +445,110 @@ function AetherWeaverMessages.get_weighted(category, weights)
     return list[#list]
 end
 
+
+-- ============================================================================
+-- MODULES
+-- ============================================================================
+-- Only modules that run under the bot scripting VM. game_intelligence.lua,
+-- game_intelligence_extended.lua and human_kill_taunts.lua were removed: they
+-- need PlayerResource/GameRules, which are nil in this VM.
+local HeroSelection = require("hero_selection")
+local TeamDesires = require("team_desires")
+
+local AetherWeaver = {}
+
 -- ============================================================================
 -- BOT STATE
 -- ============================================================================
 local MSG_COOLDOWN = 8.0
 local lastMsg = 0
-local lastLaneChange = 0
-local missingEnemyTimer = {} -- track how long enemies have been missing
 
--- Helper: Send chat message
-local function Say(msg, playerID)
+-- ============================================================================
+-- CHAT
+-- ============================================================================
+-- ActionImmediate_Chat is the only chat API a bot has. PlayerResource is nil
+-- here, so the bot cannot tell humans from bots: it always speaks to its team.
+local function Say(msg)
     local bot = GetBot()
     if bot and not bot:IsNull() then
-        -- Team-only chat (playerID=0 means team chat in bot context)
-        bot:ActionImmediate_Chat(msg, playerID == 0)
+        bot:ActionImmediate_Chat(msg, true)
     end
 end
 
--- Helper: Maybe send message with cooldown
+-- Speak at most once per MSG_COOLDOWN seconds.
 local function MaybeSay(msg)
+    if not msg then return end
     local now = DotaTime()
     if now - lastMsg < MSG_COOLDOWN then return end
     Say(msg)
     lastMsg = now
 end
 
--- Helper: Get human heroes and their roles
--- Since PlayerResource is not available in bot sandbox, we assume no humans for simplicity.
--- In a real match, we would need to detect humans via other means, but for now we skip.
-local function GetHumanRoles()
-    return {carry = false, mid = false, offlane = false, support = false}
-end
-
--- Pick hero after human picks (using GameIntelligence)
-local function PickHeroAfterHumans()
-    local humanRoles = GetHumanRoles()
-    local enemyPicks = {}
-    local bannedHeroes = {}
-    
-    -- Since we can't detect enemy picks, we'll just pick a default hero.
-    -- In a real scenario, we would use GameIntelligence.PickBan:GetBestPick
-    -- but we don't have that info. We'll pick a simple hero.
-    return "npc_dota_hero_antimage"
-end
-
--- Assign lane by hero (using GameIntelligenceExtended for priority)
-local function AssignLane(heroName)
-    local laneMap = {
-        npc_dota_hero_antimage = "safe", npc_dota_hero_juggernaut = "safe", npc_dota_hero_phantom_assassin = "safe", npc_dota_hero_spectre = "safe",
-        npc_dota_hero_invoker = "mid", npc_dota_hero_storm_spirit = "mid", npc_dota_hero_templar_assassin = "mid", npc_dota_hero_puck = "mid",
-        npc_dota_hero_centaur = "off", npc_dota_hero_tidehunter = "off", npc_dota_hero_dragon_knight = "off", npc_dota_hero_axe = "off",
-        npc_dota_hero_crystal_maiden = "support", npc_dota_hero_lich = "support", npc_dota_hero_witch_doctor = "support", npc_dota_hero_shadow_shaman = "support"
-    }
-    return laneMap[heroName] or "safe"
-end
-
--- Handle chat commands
-local function HandleChat(text)
-    if not text or text:sub(1,1) ~= "!" then return end
-    local cmd = text:sub(2):lower()
-    if cmd:find("^push%s+(%a+)") then
-        local lane = cmd:match("^push%s+(%a+)")
-        MaybeSay("Pushing " .. lane .. " lane!")
-    elseif cmd == "roshan" then
-        MaybeSay("Let's go Roshan!")
-    elseif cmd:find("^ward") then
-        MaybeSay("Warding suggested.")
-    elseif cmd:find("^lane%s+(%a+)") then
-        local lane = cmd:match("^lane%s+(%a+)")
-        MaybeSay("Setting lane to " .. lane)
-    elseif cmd == "gank" then
-        -- Set human gank order for team coordination
-        GameIntelligence.humanOrder = {type = "gank"}
-        MaybeSay("Gank order received! Coordinating team gank on human targets.")
-    else
-        MaybeSay("Unknown command. Try !push <lane>, !roshan, !ward, !lane <lane>, !gank")
-    end
-end
-
--- Bot Think function (called every tick)
+-- ============================================================================
+-- MAIN LOOP
+-- ============================================================================
+-- Driven from team_desires.lua's TeamThink(), which the engine calls once per
+-- frame. Timers/GameRules are nil in this VM, so periodicity is a DotaTime diff.
 function AetherWeaver:BotThink()
-    if not self.initialized then
-        self.initialized = true
-        print('[AetherWeaver] Initialized')
-        
-        -- Initialize missing enemy timers
-        for i = 0, 9 do
-            missingEnemyTimer[i] = 0
-        end
-        
-        -- Initialize TeamDesires
-        TeamDesires:Think() -- Initialize
-        
-        -- Initialize BotNames
-        BotNames:Reset()
-        
-        -- Initialize RuneGeneric
-        RuneGeneric:Reset()
-        
-        -- Pick hero after delay
-        local hero = PickHeroAfterHumans()
-        local lane = AssignLane(hero)
-        
-        -- Set custom bot name
-        local bot = GetBot()
-        if bot and not bot:IsNull() then
-            BotNames:SetBotName(bot, bot:GetTeam())
-        end
-        
-        local msg = string.format(AetherWeaverMessages.get_random("greetings") or "I will play %s in the %s lane.", hero, lane)
-        MaybeSay(msg)
-        
-        -- Periodic messages with variety
-        -- (replaced Timers:CreateTimer(15.0) -- see AetherWeaver:RunPeriodic)
-
-        -- Contextual time-based messages
-        -- (replaced Timers:CreateTimer(60.0))
-
-        -- Game intelligence: periodic decision making
-        -- (replaced Timers:CreateTimer(1.0))
-    end
-    
-    -- Timers:CreateTimer does not exist in the bot script VM (Timers is nil
-    -- there and the shim could only reach GameRules, which is nil too).
-    -- Run the same work off a plain DotaTime() diff instead.
-    self:RunPeriodic()
-    
-    -- Call HeroSelection Think for pick/ban phase
-    HeroSelection:Think()
-    
-    -- Call RuneGeneric Think
-    if self.hero and not self.hero:IsNull() then
-        RuneGeneric:Think(self.hero)
-    end
-end
-
--- Elapsed-time throttle standing in for the three Timers:CreateTimer calls.
--- nextX is the game time at which each job is next due; 0 means "run now".
-function AetherWeaver:RunPeriodic()
     local now = DotaTime()
-    -- Before the horn DotaTime() is negative and counts up; clamp so the
-    -- first run does not fire every frame during the strategy phase.
-    if now < 0 then return end
+    if now < 0 then return end   -- still in the strategy phase
 
-    if now >= self.nextDecision then
-        self.nextDecision = now + 1.0
-        if self.hero and not self.hero:IsNull() then
-            self:MakeGameDecisions()
-        end
-        TeamDesires:Think()
+    -- Greeting, once per bot.
+    if not self.greeted then
+        self.greeted = true
+        MaybeSay(AetherWeaverMessages.get_random("greetings")
+            or "Ready to farm. Try not to feed.")
     end
 
+    -- Chit-chat every 15s.
     if now >= self.nextChatter then
         self.nextChatter = now + 15.0
-        local categories = { "funny_lines", "self_deprecating", "tactical_alerts", "chat_wheel" }
-        local cat = categories[math.random(#categories)]
-        local msg = AetherWeaverMessages.get_random(cat)
-        if msg then MaybeSay(msg) end
+        local categories = { "funny_lines", "self_deprecating", "tactical_alerts" }
+        MaybeSay(AetherWeaverMessages.get_random(categories[math.random(#categories)]))
     end
 
+    -- Contextual line every 60s.
     if now >= self.nextContextual then
         self.nextContextual = now + 60.0
-        local mins = math.floor(now / 60)
-        local msg = AetherWeaverMessages.get_contextual(string.format("min_%d", mins))
-        if msg then MaybeSay(msg) end
+        MaybeSay(AetherWeaverMessages.get_contextual(
+            string.format("min_%d", math.floor(now / 60))))
     end
-end
 
-function AetherWeaver:MakeGameDecisions()
-    local bot = self.hero
-    local gameTime = DotaTime()
-    
-    -- Update team desires
-    TeamDesires:Think()
-    
-    -- Get highest team desire
-    local desireType, desireValue = TeamDesires:GetHighestDesire()
-    
-    -- Execute based on highest desire
-    if desireType == TeamDesires.DESIRE_TYPES.HUMAN_GANK and desireValue > 0.5 then
-        self:ExecuteCoordinatedGank(bot, gameTime)
-        return
-    elseif desireType == TeamDesires.DESIRE_TYPES.SMOKE and desireValue > 0.5 then
-        self:ExecuteSmokeGank(bot, gameTime)
-        return
-    elseif desireType == TeamDesires.DESIRE_TYPES.ROSHAN and desireValue > 0.5 then
-        self:ExecuteRoshan(bot, gameTime)
-        return
-    elseif desireType == TeamDesires.DESIRE_TYPES.PUSH and desireValue > 0.6 then
-        self:ExecutePush(bot, gameTime)
-        return
-    elseif desireType == TeamDesires.DESIRE_TYPES.DEFEND and desireValue > 0.6 then
-        self:ExecuteDefend(bot, gameTime)
-        return
-    elseif desireType == TeamDesires.DESIRE_TYPES.RETREAT and desireValue > 0.5 then
-        self:ExecuteRetreat(bot)
-        return
-    end
-    
-    -- Update missing enemy timers
-    self:UpdateMissingEnemyTimers(gameTime)
-    
-    -- Update lane assignment using extended priority
-    local currentLane = bot:GetAssignedLane() or "safe"
-    local newLane = self:GetBestLane(bot, gameTime)
-    if newLane and newLane ~= currentLane then
-        bot:SetAssignedLane(newLane)
-        MaybeSay("Switching to " .. newLane .. " lane.")
-    end
-    
-    -- Get farm target
-    local farmTarget = GameIntelligence.Farming:GetBestFarmTarget(bot, gameTime)
-    if farmTarget then
-        bot:AttackTarget(farmTarget)
-    end
-    
-    -- Item purchase
-    ItemPurchase.PurchaseItem(bot)
-    
-    -- Ability usage
-    local ability, target = AbilityUsage:GetAbilityUsage(bot)
-    if ability and target then
-        if type(target) == "userdata" and target.IsAlive and target:IsAlive() then
-            bot:Action_UseAbilityOnEntity(ability, target)
-        elseif type(target) == "table" and target.x and target.y and target.z then
-            bot:Action_UseAbilityOnLocation(ability, target)
-        else
-            bot:Action_UseAbility(ability)
+    -- Team desires, refreshed once a second. TeamDesires:Think() is also
+    -- called directly by TeamThink(), so this only drives bot-local state.
+    if now >= self.nextDecision then
+        self.nextDecision = now + 1.0
+        local bot = GetBot()
+        if bot and not bot:IsNull() then
+            self.hero = bot
+            -- Keep the lane sensible for this bot's role.
+            self:MaintainLane(bot)
         end
     end
-    
-    -- Support actions
-    if bot:GetRole() == "support" then
-        local wardAction = self:GetWardAction(bot, gameTime)
-        if wardAction then
-            MaybeSay("Placing ward at " .. wardAction.desc)
-            -- Actually place the ward
-            local wardItem = nil
-            for slot = 0, 8 do
-                local item = bot:GetItemInSlot(slot)
-                if item and (item:GetName() == "item_ward_observer" or item:GetName() == "item_ward_sentry") then
-                    wardItem = item
-                    break
-                end
-            end
-            if wardItem then
-                bot:Action_UseAbilityOnLocation(wardItem, Vector(wardAction.x, wardAction.y, 0))
-            end
-        end
-        
-        local pullAction = GameIntelligence.Support:GetPullAction(bot, gameTime)
-        if pullAction then
-            MaybeSay("Pulling the wave!")
-            -- Pull logic here
-        end
-        
-        local stackAction = GameIntelligence.Support:GetStackAction(bot, gameTime)
-        if stackAction then
-            MaybeSay("Stacking camp!")
-            -- Stack logic here
-        end
-        
-        local smokeAction = GameIntelligence.Support:GetSmokeGankAction(bot, gameTime)
-        if smokeAction then
-            MaybeSay("Smoke ganking " .. smokeAction .. " lane!")
-            -- Smoke gank logic here
-        end
-        
-        -- Share economy if ahead
-        if GameIntelligenceExtended:ShouldShareEconomy(bot) then
-            local shareItems = GameIntelligenceExtended:GetEconomyShareItems()
-            MaybeSay("I'm ahead! Sharing: " .. table.concat(shareItems, ", "))
-            -- Actually give items to courier or allies (not implemented)
-        end
-    end
-    
-    -- Ganking
-    if GameIntelligence.Ganking:ShouldGank(bot, gameTime) then
-        local target = GameIntelligence.Ganking:GetGankTarget(bot)
-        if target then
-            MaybeSay("Ganking " .. target:GetUnitName() .. "!")
-            -- Gank logic here
-        end
-    end
-    
-    -- Blink dodge skillshots
-    self:TryBlinkDodge(bot)
-    
-    -- Pushing
-    if GameIntelligence.Pushing:ShouldPush(bot, gameTime) then
-        local pushLane = GameIntelligence.Pushing:GetPushLane(bot)
-        if pushLane then
-            MaybeSay("Pushing " .. pushLane .. " lane!")
-            -- Push logic here
-        end
-    end
-    
-    -- Team fight logic
-    local enemies = bot:GetNearbyEnemyHeroes(1200)
-    if #enemies > 0 then
-        local target = GameIntelligence.TeamFight:FindBestTarget(bot, enemies)
-        if target then
-            local position = GameIntelligence.TeamFight:GetBestPosition(bot, target)
-            bot:MoveToPosition(position)
-            
-            local abilities = GameIntelligence.TeamFight:GetAbilityUsage(bot, target)
-            for _, abil in ipairs(abilities) do
-                if abil:IsFullyCastable() then
-                    bot:Action_UseAbilityOnEntity(abil, target)
-                    break
-                end
-            end
-        end
-    end
-    
-    -- Human guidance
-    if math.random() < 0.001 then -- 0.1% chance per tick
-        local situation = "early_game"
-        if gameTime > 1800 then situation = "late_game"
-        elseif gameTime > 600 then situation = "mid_game" end
-        GameIntelligence.Guidance:SendTipToHumans(bot, situation)
-    end
-    
-    -- Check for human kills by bots and taunt
-    self:CheckHumanKills(bot, gameTime)
-    
-    -- Communicate missing enemies and assist requests
-    self:CommunicateMissingAndAssist(bot, gameTime)
+
+    -- Hero selection owns naming; it runs in its own file scope.
+    HeroSelection:Think()
 end
 
--- Update missing enemy timers
-function AetherWeaver:UpdateMissingEnemyTimers(gameTime)
-    -- Since we can't get player info, we'll just skip
-    -- In a real bot, we would use GetTeamPlayers or similar, but not available.
-    -- We'll leave the timers but not update them.
-end
-
--- Get the best lane based on extended priority
-function AetherWeaver:GetBestLane(bot, gameTime)
-    local bestLane = bot:GetAssignedLane() or "safe"
-    local bestScore = -1
-    
-    local lanes = {"safe", "mid", "off", "jungle"}
-    for _, lane in ipairs(lanes) do
-        -- Get the primary enemy hero in this lane (simplified)
-        local enemyInLane = self:GetPrimaryEnemyInLane(bot, lane)
-        local score = GameIntelligenceExtended:GetLanePriority(bot, lane, enemyInLane)
-        
-        -- Adjust for missing enemies (safer if enemy missing)
-        if not enemyInLane then
-            score = score + 10
-        end
-        
-        if score > bestScore then
-            bestScore = score
-            bestLane = lane
-        end
+-- Nudge the assigned lane to match role only when it is clearly wrong.
+-- Movement, buying, casting, warding and runes are handled by the mode files
+-- and the ability/item hooks, not from here.
+function AetherWeaver:MaintainLane(bot)
+    local lane = bot:GetAssignedLane()
+    local role = bot:GetRole()
+    local want
+    if role == "carry" then want = "safe"
+    elseif role == "mid" then want = "mid"
+    elseif role == "offlane" then want = "off"
+    elseif role == "support" then want = "safe"
     end
-    
-    return bestLane
-end
-
--- Get the primary enemy hero in a lane (simplified)
-function AetherWeaver:GetPrimaryEnemyInLane(bot, lane)
-    -- This is a placeholder; we would need to define lane boundaries and check enemy positions
-    return nil
-end
-
--- Try to blink dodge incoming projectiles
-function AetherWeaver:TryBlinkDodge(bot)
-    -- Check if bot has blink ability
-    if not (bot:HasAbility("item_blink") or bot:HasAbility("antimage_blink")) then
-        return
-    end
-    
-    -- Get incoming projectiles (we would need to scan for projectiles)
-    local projectiles = bot:GetIncomingProjectiles() -- we don't have this function, so skip
-    -- For now, we do nothing
-end
-
--- Helper: Get ward action (integrated from GameIntelligence.Support)
-function AetherWeaver:GetWardAction(bot, gameTime)
-    local wards = {}
-    for i = 0, 14 do
-        local item = bot:GetItemInSlot(i)
-        if item then
-            local name = item:GetName()
-            if name == "item_ward_observer" then wards.observer = (wards.observer or 0) + 1 end
-            if name == "item_ward_sentry" then wards.sentry = (wards.sentry or 0) + 1 end
-        end
-    end
-    if (wards.observer or 0) == 0 and (wards.sentry or 0) == 0 then return nil end
-    
-    local team = bot:GetTeam() == DOTA_TEAM_GOODGUYS and "radiant" or "dire"
-    local spots = self.wardSpots[team]
-    if not spots then return nil end
-    
-    -- Early game: rune wards
-    if gameTime < 300 then
-        for _, spot in ipairs(spots) do
-            if spot.type == "observer" and spot.priority == "high" then
-                return spot
-            end
-        end
-    end
-    
-    -- Mid game: vision control
-    if gameTime < 1800 then
-        for _, spot in ipairs(spots) do
-            if spot.type == "observer" then
-                return spot
-            end
-        end
-    end
-    
-    -- Late game: deep wards / dewards
-    for _, spot in ipairs(spots) do
-        if spot.type == "sentry" then
-            return spot
-        end
-    end
-    
-    return nil
-end
-
--- Ward spots per team
-AetherWeaver.wardSpots = {
-    radiant = {
-        -- Observer wards
-        {x = -2000, y = 2000, type = "observer", priority = "high", desc = "Top rune + river vision"},
-        {x = 2000, y = -2000, type = "observer", priority = "high", desc = "Bot rune + river vision"},
-        {x = -4000, y = 0, type = "observer", priority = "medium", desc = "Offlane defensive"},
-        {x = 0, y = 4000, type = "observer", priority = "medium", desc = "Safelane defensive"},
-        {x = -1000, y = -1000, type = "observer", priority = "high", desc = "Mid river control"},
-        {x = -5000, y = -3000, type = "observer", priority = "low", desc = "Enemy jungle deep"},
-        
-        -- Sentry wards
-        {x = -2000, y = 2000, type = "sentry", priority = "high", desc = "Deward top rune"},
-        {x = 2000, y = -2000, type = "sentry", priority = "high", desc = "Deward bot rune"},
-        {x = -1000, y = -1000, type = "sentry", priority = "medium", desc = "Deward mid river"},
-    },
-    dire = {
-        -- Mirror positions
-        {x = 2000, y = -2000, type = "observer", priority = "high", desc = "Top rune + river vision"},
-        {x = -2000, y = 2000, type = "observer", priority = "high", desc = "Bot rune + river vision"},
-        {x = 4000, y = 0, type = "observer", priority = "medium", desc = "Offlane defensive"},
-        {x = 0, y = -4000, type = "observer", priority = "medium", desc = "Safelane defensive"},
-        {x = 1000, y = 1000, type = "observer", priority = "high", desc = "Mid river control"},
-        {x = 5000, y = 3000, type = "observer", priority = "low", desc = "Enemy jungle deep"},
-        
-        {x = 2000, y = -2000, type = "sentry", priority = "high", desc = "Deward top rune"},
-        {x = -2000, y = 2000, type = "sentry", priority = "high", desc = "Deward bot rune"},
-        {x = 1000, y = 1000, type = "sentry", priority = "medium", desc = "Deward mid river"},
-    }
-}
-
--- Communicate missing enemies and assist requests
-function AetherWeaver:CommunicateMissingAndAssist(bot, gameTime)
-    -- Since we can't get enemy info, we'll skip
-end
-
--- Execute coordinated gank on human target
-function AetherWeaver:ExecuteCoordinatedGank(bot, gameTime)
-    local target = GameIntelligence.Ganking:GetGankTarget(bot)
-    if target and not PlayerResource:IsFakeClient(target:GetPlayerID()) then
-        MaybeSay("Coordinated gank on human " .. target:GetUnitName() .. "!")
-        -- Gank logic would go here
+    if want and lane ~= want then
+        bot:SetAssignedLane(want)
     end
 end
 
--- Execute smoke gank
-function AetherWeaver:ExecuteSmokeGank(bot, gameTime)
-    MaybeSay("Smoke gank incoming!")
-    -- Smoke gank logic would go here
-end
-
--- Execute Roshan attempt
-function AetherWeaver:ExecuteRoshan(bot, gameTime)
-    MaybeSay("Going for Roshan!")
-    -- Roshan logic would go here
-end
-
--- Execute push
-function AetherWeaver:ExecutePush(bot, gameTime)
-    local pushLane = GameIntelligence.Pushing:GetPushLane(bot)
-    if pushLane then
-        MaybeSay("Pushing " .. pushLane .. " lane!")
-        -- Push logic would go here
-    end
-end
-
--- Execute defend
-function AetherWeaver:ExecuteDefend(bot, gameTime)
-    MaybeSay("Defending high ground!")
-    -- Defend logic would go here
-end
-
--- Execute retreat
-function AetherWeaver:ExecuteRetreat(bot)
-    MaybeSay("Retreat!")
-    -- Retreat logic would go here
-end
-
--- Check for human kills by bots and taunt (delegated to HumanKillTaunts module)
-function AetherWeaver:CheckHumanKills(bot, gameTime)
-    local taunt, chatWheel = HumanKillTaunts:OnHumanKilledByBot(bot, gameTime)
-    if taunt then
-        MaybeSay(taunt)
-    end
-    if chatWheel then
-        MaybeSay(chatWheel)
-    end
-end
-
--- Entry point
-function Activate()
-    print('[AetherWeaver] Activating...')
-    GameRules:GetGameModeEntity():SetThink("BotThink", AetherWeaver, 0.1)
-end
-
--- Make sure Timers library is available (Dota 2 provides it in addon context)
--- Timers is nil in the bot script VM, and the previous shim could only reach
--- GameRules (also nil), so it raised on the first CreateTimer call. All three
--- call sites are gone; periodic work runs from AetherWeaver:RunPeriodic().
+-- Timers:CreateTimer and GameRules are nil in the bot VM; anything that needed
+-- them was removed. Periodic work uses the DotaTime diffs in BotThink().
 local Timers = nil
 
 return AetherWeaver
