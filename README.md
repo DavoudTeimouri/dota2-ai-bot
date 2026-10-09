@@ -66,12 +66,30 @@ dota2-ai-bot/
 ```
 
 ## How to Publish to Steam Workshop
-1. **Clone or download** this repository
-2. Open **Dota 2 Workshop Tools** (DLC required)
-3. In the **Addon** panel, click **Publish** → select this folder
-4. Fill in title ("AetherWeaver"), description, tags (dota2, ai, bot)
-5. Set visibility to **Public** or **Friends Only**
-6. Click **Upload**
+1. Clone or download this repository.
+2. Open **Dota 2 Workshop Tools** (DLC required).
+3. In the **Addon** panel, click **Publish** → select this folder.
+4. Fill in title ("AetherWeaver"), description, tags (dota2, ai, bot).
+5. Set visibility to **Public** or **Friends Only**.
+6. Click **Upload**.
+
+## Running the Bot Locally (without Workshop) and use for lobby
+You can test the bot in a local lobby using the **Local DevScript** option:
+
+1. Ensure you have Dota 2 Beta and enable cheats in lobby settings.
+2. Place the entire `vscripts/bots` folder into a temporary location, e.g. `/tmp/dota2_bot/`.
+3. In the lobby console, run:
+   ```
+   dota_launch_custom_game <map_name> -vscripts /tmp/dota2_bot
+   ```
+   (Replace `<map_name>` with a map like `empty` or use the workshop ID if needed.)
+   Alternatively, after launching a cheat-enabled lobby, you can reload the script with:
+   ```
+   script_reload vscripts/bots/bot_generic.lua
+   ```
+   assuming the bot folder is mounted at `vscripts/` relative to the game.
+4. The bot will load and you should see its name and initial chat messages.
+5. Use `script_reload` to iterate on changes without restarting the lobby.
 
 ## Chat Commands
 | Command | Description |
