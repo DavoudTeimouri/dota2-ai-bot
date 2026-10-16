@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Dota 2](https://img.shields.io/badge/Dota_2-Workshop_Addon-green.svg)](https://www.dota2.com/workshop/)
 
-A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messages, hints to human players, and works as a team worker. No external dependencies — pure Lua Workshop addon.
+A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messages, hints to human players, and works as a team worker. No external dependencies — pure Lua Workshop addon. Synced to **Patch 7.41f**.
 
 ## Features
 - **Hero Selection**: Waits for human picks, then fills missing role and counters enemy lineup (falls back to POSITION_HEROES when GameRules unavailable).
@@ -15,14 +15,16 @@ A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messag
 - **Vision Control**: Optimal ward placement considering rune times, gank paths, and depth (via `mode_ward_generic.lua`).
 - **Behavioral Variance**: Occasional randomness to avoid predictability.
 - **Mode‑Based Logic**: Eight modes that compete via GetDesire():
-  - `mode_laning_generic.lua` – hold lane, last hit, do not feed
+  - `mode_laning_generic.lua` – hold lane, last hit, deny, do not feed
   - `mode_farm_generic.lua` – jungle and lane farming when laning is weak
-  - `mode_ward_generic.lua` – place wards when safe
-  - `mode_rune_generic.lua` – contest power runes around spawn windows
+  - `mode_ward_generic.lua` – place wards at per‑lane spots when safe
+  - `mode_rune_generic.lua` – contest power and bounty runes around spawn windows
   - `mode_item_generic.lua` – walk to shop when next item is affordable
   - `mode_push_lane_generic.lua` – push lane with wave and numbers advantage
   - `mode_retreat_generic.lua` – disengage when low and outnumbered
   - `mode_team_roam_generic.lua` – join allied fights, focus fire
+- **Deny Logic**: Attacks own low‑HP creeps when no clean last hit is available, denying enemy gold and XP.
+- **Rune Control**: Contests both power runes (2‑min cycle) and bounty runes (5‑min cycle) around spawn windows.
 - **Phased Strategies**: Early farm/deny → mid‑game gank & tower pressure → late‑game Roshan & team fights.
 - **Teamwork**: Shares vision hints, calls missing enemies, coordinates smoke ganks, buys courier upgrades, pulls/stacks jungle, heals/shields allies.
 - **Team Fight**: Prioritizes targets (squishy > disable > carry), uses ability combos, positions safely, initiates/disengages as needed.
@@ -49,20 +51,25 @@ dota2-ai-bot/
 │   └── PULL_REQUEST_TEMPLATE.md
 └── vscripts/
     └── bots/
-        ├── init.lua           # Bot entry point
-        ├── game_intelligence.lua          # Core pick/ban, laning, farming, support, gank, push, teamfight, guidance
-        ├── game_intelligence_extended.lua # Extended features: lane priority, adaptive items, teamfight positioning, communication pings, vision control, behavioral variance, economy sharing, hero micro, replay learning placeholder
-        ├── ability_item_usage_generic.lua # Ability usage with hero override support
-        ├── item_purchase_generic.lua      # Item purchase with hero override support
-        ├── courier_generic.lua            # Stub (required by engine)
-        ├── rune_generic.lua               # Stub (required by engine)
-        ├── skill_build_generic.lua        # Stub (required by engine)
-        ├── mode_farm_generic.lua          # Example mode‑based logic (farm)
-        └── Customize/
-            └── hero/
-                └── antimage/
-                    ├── antimage.lua       # Hero override: item/skill builds
-                    └── ability.lua        # Hero override: ability usage
+        ├── ability_item_usage_generic.lua   # Generic ability/item/buyback/level-up hooks
+        ├── ability_item_usage_antimage.lua  # Anti‑Mage per‑hero override (example)
+        ├── bot_generic.lua                  # Minion AI entry point (MinionThink only)
+        ├── bot_names.lua                    # Human‑like name pool (EN/ZH/KO/RU/ES)
+        ├── courier_generic.lua              # Courier usage hook (stash delivery)
+        ├── hero_selection.lua               # Hero pick/ban phase (Think) + naming
+        ├── init.lua                         # Message library + lane upkeep (BotThink)
+        ├── item_purchase_generic.lua        # Generic item purchase hook with build orders
+        ├── rune_generic.lua                 # Rune reset stub (required by engine)
+        ├── skill_build_generic.lua          # Skill build hook (forwards to ability_item_usage)
+        ├── team_desires.lua                 # Team‑level desire calculator + TeamThink executor
+        ├── mode_farm_generic.lua            # Farm mode (neutral creeps + lane wave)
+        ├── mode_item_generic.lua            # Item/shop mode (walk to shop when affordable)
+        ├── mode_laning_generic.lua          # Laning mode (last hit + deny)
+        ├── mode_push_lane_generic.lua       # Push mode (wave + numbers advantage)
+        ├── mode_retreat_generic.lua         # Retreat mode (low HP + outnumbered)
+        ├── mode_team_roam_generic.lua       # Team roam mode (join allied fights)
+        ├── mode_ward_generic.lua            # Ward mode (per‑lane ward spots)
+        └── mode_rune_generic.lua            # Rune mode (power + bounty runes)
 ```
 
 ## How to Publish to Steam Workshop
@@ -106,7 +113,7 @@ Edit `vscripts/bots/init.lua` to change:
 - Chat command handling
 - Strategy logic in `BotThink`
 
-Edit hero‑specific overrides under `vscripts/bots/Customize/hero/<hero_name>/` to customize item builds, skill builds, and ability usage for any hero.
+Edit hero‑specific overrides at the bot root (`ability_item_usage_<hero>.lua` and `item_purchase_<hero>.lua`) to customize item builds, skill builds, and ability usage for any hero.
 
 ## Requirements
 - Dota 2 with Workshop Tools DLC
