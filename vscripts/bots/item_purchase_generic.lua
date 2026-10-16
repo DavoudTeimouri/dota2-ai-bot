@@ -22,7 +22,7 @@ ItemPurchase.BUILDS = {
         { "item_tango",         90,  "home"   },
         { "item_fairy_flare",   180, "home"   },
         { "item_ward_sentry",   50,  "home"   },
-        { "item_medallion_of_courage", 400, "side" },
+        { "item_medallion_of_courage", 400, "secret" },
         { "item_ghost_scepter", 1500, "side" },
         { "item_aghanims_scepter", 4200, "secret" },
         { "item_ward_dispensary", 900, "side" },
