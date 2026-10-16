@@ -7,6 +7,32 @@ local function HasObserver(bot)
     return bot:HasItem("item_ward_observer") or bot:HasItem("item_ward_sentry")
 end
 
+-- Known warding spots by lane: {x, y} offsets from lane front toward river/jungle.
+-- These are safe, commonly useful spots (rune entrances, jungle paths).
+local WARDSPOTS = {
+    safe  = { { x = 700,  y = 1200 }, { x = -400, y = 2800 } },
+    mid   = { { x = -1200, y = 1200 }, { x = 1200,  y = -1200 } },
+    off   = { { x = -2800, y = -400 }, { x = -1200, y = -700 } },
+}
+
+local function GetWardSpot(bot)
+    local lane = bot:GetAssignedLane() or "safe"
+    local spots = WARDSPOTS[lane] or WARDSPOTS.safe
+    local pos = bot:GetAbsOrigin()
+    -- Pick the spot closest to the bot so it doesn't walk halfway across map.
+    local best, bestDist = nil, math.huge
+    for _, spot in ipairs(spots) do
+        local dx = spot.x - pos.x
+        local dy = spot.y - pos.y
+        local d = math.sqrt(dx * dx + dy * dy)
+        if d < bestDist then
+            bestDist = d
+            best = spot
+        end
+    end
+    return best
+end
+
 function GetDesire()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return 0 end
@@ -57,10 +83,9 @@ function Think()
     local ward = FindWard(bot)
     if not ward then return end
 
-    -- Prefer the lane we are assigned to: stand forward and cover the approach.
-    local lane = bot:GetAssignedLane() or "safe"
-    local pos = GetLaneFrontLocation(GetTeam(), lane, 250)
-    if pos then
-        bot:Action_UseAbilityOnLocation(ward, pos)
+    -- Place at a known ward spot near the bot's lane, not blindly at lane front.
+    local spot = GetWardSpot(bot)
+    if spot then
+        bot:Action_UseAbilityOnLocation(ward, spot)
     end
 end

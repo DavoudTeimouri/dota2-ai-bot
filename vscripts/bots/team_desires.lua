@@ -40,6 +40,7 @@ end
 
 -- Get all allied bots
 local function GetAlliedBots()
+    if not PlayerResource then return {} end
     local bots = {}
     local team = GetTeam()
     for i = 0, 9 do
@@ -55,6 +56,7 @@ end
 
 -- Get enemy heroes visible
 local function GetVisibleEnemies()
+    if not PlayerResource then return {} end
     local enemies = {}
     local team = GetTeam()
     for i = 0, 9 do
@@ -70,6 +72,7 @@ end
 
 -- Count human players on enemy team
 local function CountHumanEnemies()
+    if not PlayerResource then return 0 end
     local count = 0
     local team = GetTeam()
     for i = 0, 9 do
@@ -84,6 +87,7 @@ end
 
 -- Count human cores (carry/mid) on enemy team
 local function CountHumanCores()
+    if not PlayerResource then return 0 end
     local count = 0
     local team = GetTeam()
     for i = 0, 9 do
@@ -136,6 +140,7 @@ end
 
 -- Get net worth advantage
 local function GetNetWorthAdvantage()
+    if not PlayerResource then return 0 end
     local team = GetTeam()
     local myNW = 0
     local enemyNW = 0

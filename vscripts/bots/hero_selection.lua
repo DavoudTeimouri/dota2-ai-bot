@@ -287,6 +287,19 @@ local function EnsureBotName(bot)
     BotNames:SetBotName(bot, bot:GetTeam())
 end
 
+-- Say uses only bot API: ActionImmediate_Chat. PlayerResource is nil in this VM,
+-- so we always speak to our own team (playerID == 0 means team chat).
+local function Say(msg)
+    local bot = GetBot()
+    if bot and not bot:IsNull() then
+        bot:ActionImmediate_Chat(msg, true)
+    end
+end
+
+-- Team ID constants; GameRules may not expose them in the bot VM.
+local DOTA_TEAM_GOODGUYS = 2
+local DOTA_TEAM_BADGUYS = 3
+
 function HeroSelection:Think()
     -- Initialize on first call
     if not phaseState.initialized then
@@ -300,11 +313,10 @@ function HeroSelection:Think()
     -- Naming works in every game phase, so do it before the pick/ban checks.
     EnsureBotName(bot)
 
-    -- GameRules is nil in the bot script VM, so there is no way to read the
-    -- game state here. Returning is the safe default: Valve's own hero
-    -- selection runs instead of crashing this file.
+    -- GameRules and PlayerResource are nil in the bot script VM. Guard both.
     if not GameRules then return end
     if GameRules.State_Get == nil then return end
+    if not PlayerResource then return end
     
     local gameState = GameRules:State_Get()
     if gameState ~= DOTA_GAMERULES_STATE_HERO_SELECTION then

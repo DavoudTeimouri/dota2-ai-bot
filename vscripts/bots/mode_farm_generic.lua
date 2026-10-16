@@ -33,8 +33,8 @@ function GetDesire()
     elseif role == "support" then desire = desire - 0.1 end
 
     -- Nothing nearby to hit: farming has no target, let another mode run.
-    if not bot.GetNearbyNeutralCamps then return nil end
-    if #bot:GetNearbyNeutralCamps(1500) == 0 then return 0 end
+    if not bot.GetNearbyNeutralCreeps then return nil end
+    if #bot:GetNearbyNeutralCreeps(1500) == 0 then return 0 end
 
     return desire
 end
@@ -43,8 +43,8 @@ function Think()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
 
-    -- Neutral camps first: highest tier available.
-    local neutrals = bot:GetNearbyNeutralCamps(1500)
+    -- Neutral creeps first: highest tier available.
+    local neutrals = bot:GetNearbyNeutralCreeps(1500)
     if #neutrals > 0 then
         local best, bestTier = nil, 0
         for _, creep in ipairs(neutrals) do

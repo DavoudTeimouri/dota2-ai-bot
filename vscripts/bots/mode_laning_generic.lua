@@ -61,10 +61,27 @@ function Think()
                 best, lowest = creep, hp
             end
         end
-        -- No clean last hit: do not feed, hold position in lane.
+        -- Clean last hit available: take it.
         if best then
             bot:AttackTarget(best)
             return
+        end
+
+        -- No clean last hit: deny our own creep if it's almost dead and enemy
+        -- would get the last hit. Prevents free gold/xp for the opponent.
+        local friendlyCreeps = bot:GetNearbyLaneCreeps(800, false)
+        if #friendlyCreeps > 0 then
+            local bestDeny, lowestDeny = nil, math.huge
+            for _, creep in ipairs(friendlyCreeps) do
+                local hp = creep:GetHealth()
+                if hp < lowestDeny and hp <= bot:GetAttackDamage() then
+                    bestDeny, lowestDeny = creep, hp
+                end
+            end
+            if bestDeny then
+                bot:AttackTarget(bestDeny)
+                return
+            end
         end
     end
 

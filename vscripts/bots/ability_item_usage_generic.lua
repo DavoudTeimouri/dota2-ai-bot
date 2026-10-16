@@ -60,19 +60,36 @@ function AbilityUsage:GetAbilityUsage(bot)
 end
 
 -- Use an active item (dust, smoke, orchid) when enemies are near.
+-- No-target items (dust, smoke) are cast on self; unit-target items (orchid)
+-- are cast on the nearest enemy.
+local NO_TARGET_ITEMS = { "item_dust", "item_smoke_of_deceit" }
+local UNIT_TARGET_ITEMS = { "item_orchid_malevolence" }
+
 function AbilityUsage:GetItemUsage(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return nil end
 
     local enemies = bot:GetNearbyEnemyHeroes(900, true)
-    if enemies and #enemies > 0 then
-        for _, name in ipairs({ "item_dust", "item_smoke_of_deceit", "item_orchid_malevolence" }) do
-            if bot:HasItem(name) then
-                -- Resolve the handle by scanning inventory slots 0-8.
-                for s = 0, 8 do
-                    local it = bot:GetItemInSlot(s)
-                    if it and not it:IsNull() and it:GetName() == name then
-                        return it, enemies[1]
-                    end
+    if #enemies == 0 then return nil end
+
+    -- No-target items: cast on self when enemies nearby.
+    for _, name in ipairs(NO_TARGET_ITEMS) do
+        if bot:HasItem(name) then
+            for s = 0, 8 do
+                local it = bot:GetItemInSlot(s)
+                if it and not it:IsNull() and it:GetName() == name then
+                    return it, nil
+                end
+            end
+        end
+    end
+
+    -- Unit-target items: cast on nearest visible enemy.
+    for _, name in ipairs(UNIT_TARGET_ITEMS) do
+        if bot:HasItem(name) then
+            for s = 0, 8 do
+                local it = bot:GetItemInSlot(s)
+                if it and not it:IsNull() and it:GetName() == name then
+                    return it, enemies[1]
                 end
             end
         end

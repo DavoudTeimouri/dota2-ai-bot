@@ -20,10 +20,14 @@ function GetDesire()
     if allies <= enemies then return 0 end
 
     -- Nothing to push with.
-    if #bot:GetPushingWaves(800) == 0 then return nil end
+    local pushingWaves = 0
+    if bot.GetPushingWaves then
+        pushingWaves = #bot:GetPushingWaves(800)
+    end
+    if pushingWaves == 0 then return nil end
 
     -- A big wave is the whole point of a push.
-    if #bot:GetPushingWaves(800) < 2 then return nil end
+    if pushingWaves < 2 then return nil end
 
     local desire = 0.5
     if allies >= enemies + 2 then desire = desire + 0.15 end

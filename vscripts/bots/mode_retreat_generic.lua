@@ -42,7 +42,9 @@ function Think()
     if #enemies == 0 then
         -- Nothing chasing: go home and heal.
         if GetShopLocation then
-            local home = GetShopLocation(bot:GetTeam(), SHOP_HOME)
+            -- SHOP_HOME is provided by the Dota 2 VM; guard against absence.
+            local shopHome = _G.SHOP_HOME or 0
+            local home = GetShopLocation(bot:GetTeam(), shopHome)
             if home then bot:Action_MoveToLocation(home) end
         end
         return
@@ -55,7 +57,14 @@ function Think()
     local len = math.sqrt(dx * dx + dy * dy)
     if len < 1 then return end
 
-    local away = Vector(pos.x + (dx / len) * 1200, pos.y + (dy / len) * 1200)
+    local awayX = pos.x + (dx / len) * 1200
+    local awayY = pos.y + (dy / len) * 1200
+    local away
+    if Vector then
+        away = Vector(awayX, awayY)
+    else
+        away = { x = awayX, y = awayY }
+    end
     if away then
         bot:Action_MoveToLocation(away)
     end

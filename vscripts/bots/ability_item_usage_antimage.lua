@@ -22,8 +22,15 @@ function AM:GetAbilityUsage(bot)
         local epos = enemies[1]:GetAbsOrigin()
         local dx, dy = pos.x - epos.x, pos.y - epos.y
         local len = math.sqrt(dx * dx + dy * dy)
-        if len > 1 and Vector then
-            local away = Vector(pos.x + (dx / len) * 1200, pos.y + (dy / len) * 1200)
+        if len > 1 then
+            local awayX = pos.x + (dx / len) * 1200
+            local awayY = pos.y + (dy / len) * 1200
+            local away
+            if Vector then
+                away = Vector(awayX, awayY)
+            else
+                away = { x = awayX, y = awayY }
+            end
             if away then
                 return blink, away
             end

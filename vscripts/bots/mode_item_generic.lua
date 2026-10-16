@@ -10,9 +10,9 @@ local ItemPurchase = require("item_purchase_generic")
 
 -- Map a build-order shop name onto the engine's SHOP_* constant.
 local SHOP_CONST = {
-    home   = SHOP_HOME,
-    side   = SHOP_SIDE,
-    secret = SHOP_SECRET,
+    home   = _G.SHOP_HOME   or 0,
+    side   = _G.SHOP_SIDE   or 1,
+    secret = _G.SHOP_SECRET or 2,
 }
 
 -- The next item this bot wants, and which shop sells it.
