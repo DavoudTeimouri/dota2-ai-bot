@@ -71,6 +71,7 @@ HeroRules.ULT_RULES = {
     dazzle = "defend",
     abaddon = "defend",
     omniknight = "defend",
+    ancient_apparition = "defend",
     witch_doctor = "always",
     lion = "burst",
     shadow_shaman = "initiate",
@@ -89,6 +90,19 @@ HeroRules.ULT_RULES = {
     meepo = "burst",
     arc_warden = "always",
     muerta = "always",
+    treant = "initiate",
+    undying = "dodge",
+
+    -- Late additions to the pool.
+    marci = "dodge",
+    obsidian_destroyer = "burst",
+    silencer = "always",
+    skywrath_mage = "burst",
+
+    -- Two heroes that are too new to know the ultimates of. "default" is
+    -- the built-in rule: two or more enemies in range, or a low target.
+    kez = "default",
+    reaper = "default",
 }
 
 -- The order a hero should level its abilities in. Only listed where the

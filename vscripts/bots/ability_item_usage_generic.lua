@@ -84,7 +84,8 @@ local function UltimateIsWorthIt(bot, ability, target, enemyCount)
         return hpPct < 0.3
     end
 
-    -- Default.
+    -- Default: two or more enemies, or a target already low. This is also
+    -- the rule for the heroes marked "default" in hero_rules.lua.
     if enemyCount >= 2 then return true end
     local hp = target:GetHealth() / math.max(1, target:GetMaxHealth())
     return hp < 0.4

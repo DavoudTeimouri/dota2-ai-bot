@@ -6,7 +6,8 @@
 --
 -- The previous version defined only a module method and a global
 -- GetFarmAction(), neither of which the engine ever calls, so this mode could
--- never activate.
+-- never activate. The global GetDesire() and Think() below are what the
+-- engine reads.
 local BotLane = require("bot_lane")
 local Compat = require("bot_compat")
 

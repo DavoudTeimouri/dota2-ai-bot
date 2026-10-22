@@ -31,7 +31,7 @@ function GetDesire()
     if hpPct < 0.5 then desire = desire * 0.5 end
 
     -- Supports with an unplaced observer want the ward mode to win instead.
-    if BotLane.GetRole(bot) == "support" and bot.GetAvailableWards and bot:GetAvailableWards() > 0 then
+    if BotLane.GetRole(bot) == "support" and Compat.AvailableWards(bot) > 0 then
         desire = desire * 0.5
     end
 

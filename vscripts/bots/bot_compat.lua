@@ -163,24 +163,6 @@ function Compat.AbilityInSlot(bot, slot)
     return nil
 end
 
--- Slot index of an item, or -1 when the bot does not hold it.
-function Compat.ItemSlot(bot, name)
-    if not bot or bot:IsNull() then return -1 end
-    if bot.FindItemSlot then
-        local ok, slot = pcall(bot.FindItemSlot, bot, name)
-        if ok and slot then return slot end
-    end
-    if bot.GetItemInSlot then
-        for s = 0, 8 do
-            local it = bot:GetItemInSlot(s)
-            if it and not it:IsNull() and it:GetName() == name then
-                return s
-            end
-        end
-    end
-    return -1
-end
-
 -- Item handle by name, or nil when the bot does not hold it.
 function Compat.ItemByName(bot, name)
     if not bot or bot:IsNull() then return nil end
