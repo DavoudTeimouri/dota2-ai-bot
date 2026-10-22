@@ -7,6 +7,7 @@
 -- when the bot is physically standing at a shop. Without this mode a bot earns
 -- gold mid-lane and never walks back, so it buys nothing all game.
 local ItemPurchase = require("item_purchase_generic")
+local Compat = require("bot_compat")
 
 -- Map a build-order shop name onto the engine's SHOP_* constant.
 local SHOP_CONST = {
@@ -43,6 +44,13 @@ function Think()
 
     local loc = GetShopLocation(bot:GetTeam(), SHOP_CONST[shop])
     if loc then
-        bot:Action_MoveToLocation(loc)
+        Compat.MoveTo(bot, loc)
     end
 end
+
+-- The engine calls the global GetDesire()/Think() above. Returning the table
+-- as well lets the module be required and tested without the engine.
+return {
+    GetDesire = GetDesire,
+    Think = Think,
+}

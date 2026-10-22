@@ -20,6 +20,7 @@ local BOUNTY_SPOTS = {
 }
 
 local BotLane = require("bot_lane")
+local Compat = require("bot_compat")
 
 local function AvailableRune(locList, statusCheck)
     if not GetRuneStatus then return nil end
@@ -74,14 +75,14 @@ function Think()
     -- Prefer a power rune we know is sitting there.
     local loc = AvailableRune(RUNE_SPOTS, RUNE_STATUS_AVAILABLE)
     if loc and GetRuneSpawnLocation then
-        bot:Action_MoveToLocation(GetRuneSpawnLocation(loc))
+        Compat.MoveTo(bot, GetRuneSpawnLocation(loc))
         return
     end
 
     -- Otherwise a bounty rune.
     loc = AvailableRune(BOUNTY_SPOTS, RUNE_STATUS_AVAILABLE)
     if loc and GetRuneSpawnLocation then
-        bot:Action_MoveToLocation(GetRuneSpawnLocation(loc))
+        Compat.MoveTo(bot, GetRuneSpawnLocation(loc))
         return
     end
 
@@ -89,7 +90,14 @@ function Think()
     if GetLaneFrontLocation then
         local pos = GetLaneFrontLocation(bot:GetTeam(), BotLane.LANE_MID, 0)
         if pos then
-            bot:Action_MoveToLocation(pos)
+            Compat.MoveTo(bot, pos)
         end
     end
 end
+
+-- The engine calls the global GetDesire()/Think() above. Returning the table
+-- as well lets the module be required and tested without the engine.
+return {
+    GetDesire = GetDesire,
+    Think = Think,
+}

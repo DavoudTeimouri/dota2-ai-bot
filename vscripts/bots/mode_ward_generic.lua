@@ -3,11 +3,13 @@
 -- Engine contract: GetDesire runs every frame for every mode; nil falls back
 -- to Valve's desire. A support with no wards must return nil (not 0) so
 -- Valve's built-in warding takes over instead of leaving the bot passive.
-local function HasObserver(bot)
-    return bot:HasItem("item_ward_observer") or bot:HasItem("item_ward_sentry")
-end
-
 local BotLane = require("bot_lane")
+local Compat = require("bot_compat")
+
+local function HasObserver(bot)
+    return Compat.HasItem(bot, "item_ward_observer")
+        or Compat.HasItem(bot, "item_ward_sentry")
+end
 
 -- Known warding spots by lane: {x, y} offsets from lane front toward river/jungle.
 -- These are safe, commonly useful spots (rune entrances, jungle paths).
@@ -20,7 +22,8 @@ local WARDSPOTS = {
 local function GetWardSpot(bot)
     local lane = BotLane.GetAssigned(bot)
     local spots = WARDSPOTS[lane] or WARDSPOTS[BotLane.LANE_BOT]
-    local pos = bot:GetAbsOrigin()
+    local pos = Compat.Position(bot)
+    if not pos then return spots[1] end
     -- Pick the spot closest to the bot so it doesn't walk halfway across map.
     local best, bestDist = nil, math.huge
     for _, spot in ipairs(spots) do
@@ -56,7 +59,7 @@ function GetDesire()
     if bot:DistanceFromFountain() == 0 then desire = desire + 0.2 end
 
     -- If enemies are visible nearby, fight mode should win.
-    if #bot:GetNearbyEnemyHeroes(1200, true) > 0 then
+    if #Compat.Enemies(bot, 1200) > 0 then
         desire = desire - 0.3
     end
 
@@ -64,18 +67,11 @@ function GetDesire()
     return desire
 end
 
--- Resolve a ward handle by scanning the inventory; slot 6 is not guaranteed.
+-- Resolve a ward handle by name; the slot is not fixed.
 local function FindWard(bot)
-    for s = 0, 8 do
-        local it = bot:GetItemInSlot(s)
-        if it and not it:IsNull() then
-            local name = it:GetName()
-            if name == "item_ward_observer" or name == "item_ward_sentry" then
-                return it
-            end
-        end
-    end
-    return nil
+    local ward = Compat.ItemByName(bot, "item_ward_observer")
+    if ward then return ward end
+    return Compat.ItemByName(bot, "item_ward_sentry")
 end
 
 function Think()
@@ -88,6 +84,13 @@ function Think()
     -- Place at a known ward spot near the bot's lane, not blindly at lane front.
     local spot = GetWardSpot(bot)
     if spot then
-        bot:Action_UseAbilityOnLocation(ward, spot)
+        Compat.UseAbility(bot, ward, spot)
     end
 end
+
+-- The engine calls the global GetDesire()/Think() above. Returning the table
+-- as well lets the module be required and tested without the engine.
+return {
+    GetDesire = GetDesire,
+    Think = Think,
+}

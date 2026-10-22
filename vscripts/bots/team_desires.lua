@@ -3,6 +3,7 @@
 -- Provides Think() for team coordination and desire broadcasting
 
 local TeamDesires = {}
+local Compat = require("bot_compat")
 
 -- Team desire types
 local DESIRE_TYPES = {
@@ -40,7 +41,12 @@ end
 
 -- Get all allied bots
 local function GetAlliedBots()
-    if not PlayerResource then return {} end
+    if not PlayerResource then
+        -- No PlayerResource in the bot VM: fall back to the ally query.
+        local bot = GetBot()
+        if not bot or bot:IsNull() then return {} end
+        return Compat.Allies(bot, 50000)
+    end
     local bots = {}
     local team = GetTeam()
     for i = 0, 9 do
@@ -56,7 +62,12 @@ end
 
 -- Get enemy heroes visible
 local function GetVisibleEnemies()
-    if not PlayerResource then return {} end
+    if not PlayerResource then
+        -- No PlayerResource in the bot VM: fall back to the enemy query.
+        local bot = GetBot()
+        if not bot or bot:IsNull() then return {} end
+        return Compat.Enemies(bot, 50000)
+    end
     local enemies = {}
     local team = GetTeam()
     for i = 0, 9 do
@@ -127,11 +138,9 @@ local function HasSmokeAvailable()
     local bots = GetAlliedBots()
     for _, bot in ipairs(bots) do
         if bot and not bot:IsNull() then
-            for slot = 0, 8 do
-                local item = bot:GetItemInSlot(slot)
-                if item and item:GetName() == "item_smoke_of_deceit" then
-                    return true
-                end
+            -- Compat handles handles that do not expose an inventory.
+            if Compat.HasItem(bot, "item_smoke_of_deceit") then
+                return true
             end
         end
     end
@@ -159,12 +168,16 @@ local function GetNetWorthAdvantage()
     return myNW - enemyNW
 end
 
--- Check Roshan status
+-- Check Roshan status.
+-- GetRoshanKillTime() is the real API: the DotaTime() stamp of the last
+-- Roshan kill, 0 if it has never been killed. Roshan respawns 8-11 minutes
+-- after a kill, so it is available again once that window has passed.
 local function IsRoshanAlive()
-    -- This would need actual Roshan entity check
-    -- Placeholder: assume alive after 20 minutes if not recently killed
-    local gameTime = GetGameTime()
-    return gameTime > 1200 -- After 20 minutes
+    if not GetRoshanKillTime then return true end
+    local lastKill = GetRoshanKillTime()
+    if lastKill <= 0 then return true end
+    local sinceKill = GetGameTime() - lastKill
+    return sinceKill >= 480  -- 8 minutes: the lower bound of the respawn window
 end
 
 -- Calculate push desire
@@ -240,6 +253,9 @@ local function CalculateRoshanDesire()
     
     -- Roshan becomes relevant after 20 min
     if gameTime < 1200 then return 0 end
+    
+    -- No point grouping up for a Roshan that is not there.
+    if not IsRoshanAlive() then return 0 end
     
     -- Need at least 3 alive allies
     if aliveAllies < 3 then return 0 end
@@ -440,8 +456,8 @@ local function CalculateRetreatDesire()
     end
     
     -- Outnumbered
-    local nearbyEnemies = #bot:GetNearbyEnemyHeroes(1200)
-    local nearbyAllies = #bot:GetNearbyHeroes(1200, false, BOT_MODE_NONE)
+    local nearbyEnemies = #Compat.Enemies(bot, 1200)
+    local nearbyAllies = #Compat.Allies(bot, 1200)
     if nearbyEnemies > nearbyAllies + 1 then
         desire = desire + 0.3
     end

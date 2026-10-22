@@ -6,6 +6,8 @@
 -- The old Customize/hero/antimage/*.lua files were never loaded by anything.
 local AM = {}
 
+local Compat = require("bot_compat")
+
 -- Blink away when low, otherwise burn the lowest-HP enemy in range.
 function AM:GetAbilityUsage(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return nil end
@@ -13,26 +15,28 @@ function AM:GetAbilityUsage(bot)
     local blink = bot:GetAbilityByName("antimage_blink")
     local manaBreak = bot:GetAbilityByName("antimage_mana_break")
     local spellShield = bot:GetAbilityByName("antimage_spell_shield")
-    local enemies = bot:GetNearbyEnemyHeroes(1200, true)
+    local enemies = Compat.Enemies(bot, 1200)
 
     -- Nothing to burn and nothing to dodge: sit on Blink.
     local hpPct = bot:GetHealth() / bot:GetMaxHealth()
     if hpPct < 0.3 and blink and blink:IsFullyCastable() and #enemies > 0 then
-        local pos = bot:GetAbsOrigin()
-        local epos = enemies[1]:GetAbsOrigin()
-        local dx, dy = pos.x - epos.x, pos.y - epos.y
-        local len = math.sqrt(dx * dx + dy * dy)
-        if len > 1 then
-            local awayX = pos.x + (dx / len) * 1200
-            local awayY = pos.y + (dy / len) * 1200
-            local away
-            if Vector then
-                away = Vector(awayX, awayY)
-            else
-                away = { x = awayX, y = awayY }
-            end
-            if away then
-                return blink, away
+        local pos = Compat.Position(bot)
+        local epos = Compat.Position(enemies[1])
+        if pos and epos then
+            local dx, dy = pos.x - epos.x, pos.y - epos.y
+            local len = math.sqrt(dx * dx + dy * dy)
+            if len > 1 then
+                local awayX = pos.x + (dx / len) * 1200
+                local awayY = pos.y + (dy / len) * 1200
+                local away
+                if Vector then
+                    away = Vector(awayX, awayY)
+                else
+                    away = { x = awayX, y = awayY }
+                end
+                if away then
+                    return blink, away
+                end
             end
         end
     end
@@ -86,7 +90,7 @@ function AM:AbilityLevelUpThink(bot)
     for _, name in ipairs(self.SKILL_PRIORITY) do
         local ability = bot:GetAbilityByName(name)
         if ability and not ability:IsNull() and ability:CanAbilityBeUpgraded() then
-            return bot:ActionImmediate_LevelUpAbility(ability) and true or false
+            return Compat.LevelAbility(bot, ability)
         end
     end
     return false
@@ -99,16 +103,7 @@ function AbilityUsageThink()
     if not bot or bot:IsNull() then return end
     local ability, target = AM:GetAbilityUsage(bot)
     if not ability then return end
-    if target then
-        if target.GetAbsOrigin and not target.GetHealth then
-            -- A location, not a unit.
-            bot:Action_UseAbilityOnLocation(ability, target)
-        else
-            bot:Action_UseAbilityOnEntity(ability, target)
-        end
-    else
-        bot:Action_UseAbility(ability)
-    end
+    Compat.UseAbility(bot, ability, target)
 end
 
 function AbilityLevelUpThink()

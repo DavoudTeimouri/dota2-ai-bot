@@ -4,10 +4,10 @@
 -- back to Valve's desire; 0 opts out. This must stay below retreat so a hurt
 -- bot never pushes, and above laning only when the numbers justify it.
 local BotLane = require("bot_lane")
+local Compat = require("bot_compat")
 
 local function CountAllies(bot)
-    if not bot.GetNearbyAlliedHeroes then return 0 end
-    return #bot:GetNearbyAlliedHeroes(1800)
+    return #Compat.Allies(bot, 1800)
 end
 
 function GetDesire()
@@ -17,15 +17,12 @@ function GetDesire()
     -- Hurt or outnumbered: retreat and shopping come first.
     if bot:GetHealth() < bot:GetMaxHealth() * 0.5 then return 0 end
 
-    local enemies = #bot:GetNearbyEnemyHeroes(1800, true)
+    local enemies = #Compat.Enemies(bot, 1800)
     local allies = CountAllies(bot)
     if allies <= enemies then return 0 end
 
     -- Nothing to push with.
-    local pushingWaves = 0
-    if bot.GetPushingWaves then
-        pushingWaves = #bot:GetPushingWaves(800)
-    end
+    local pushingWaves = #Compat.PushingWaves(bot, 800)
     if pushingWaves == 0 then return nil end
 
     -- A big wave is the whole point of a push.
@@ -51,6 +48,13 @@ function Think()
         end
     end
     if pos then
-        bot:Action_AttackMove(pos)
+        Compat.AttackMove(bot, pos)
     end
 end
+
+-- The engine calls the global GetDesire()/Think() above. Returning the table
+-- as well lets the module be required and tested without the engine.
+return {
+    GetDesire = GetDesire,
+    Think = Think,
+}

@@ -279,12 +279,40 @@ end
 -- Set the custom bot name exactly once per bot, and keep it across respawns.
 local named = {}
 
+-- Heroes already taken this game, per team, so two bots on the same team do
+-- not pick the same hero.
+local picked = { radiant = {}, dire = {} }
+
 local function EnsureBotName(bot)
     if not bot or bot:IsNull() then return end
     if named[bot] then return end
     named[bot] = true
     local BotNames = require("bot_names")
     BotNames:SetBotName(bot, bot:GetTeam())
+end
+
+-- SelectHero() wants the short hero name ("antimage"), the pools hold the
+-- full unit name ("npc_dota_hero_antimage").
+local function ShortHeroName(full)
+    if not full then return nil end
+    return (full:gsub("^npc_dota_hero_", ""))
+end
+
+-- Actually lock the hero in. Returns true when SelectHero was called.
+local function CommitPick(playerID, heroFull, teamKey)
+    if not SelectHero then return false end
+    if not heroFull then return false end
+    if picked[teamKey] and picked[teamKey][heroFull] then return false end
+
+    local short = ShortHeroName(heroFull)
+    if not short or short == "" then return false end
+
+    local ok = pcall(SelectHero, playerID, short)
+    if not ok then return false end
+    if not picked[teamKey] then picked[teamKey] = {} end
+    picked[teamKey][heroFull] = true
+    print("[HeroSelection] Selected: " .. short)
+    return true
 end
 
 -- Say uses only bot API: ActionImmediate_Chat. PlayerResource is nil in this VM,
@@ -300,6 +328,43 @@ end
 local DOTA_TEAM_GOODGUYS = 2
 local DOTA_TEAM_BADGUYS = 3
 
+-- The bot script VM has no GameRules and no PlayerResource, so the full
+-- Captains Mode flow cannot run there. The API still exposes
+-- IsPlayerInHeroSelectionControl() and SelectHero(), which is enough to pick
+-- a hero when it is this player's turn.
+local function FallbackPick(bot)
+    if not SelectHero then return end
+    if not IsPlayerInHeroSelectionControl then return end
+
+    local playerID = bot:GetPlayerID()
+    if playerID < 0 or playerID > 9 then return end
+
+    local ok, inControl = pcall(IsPlayerInHeroSelectionControl, playerID)
+    if not ok or not inControl then return end
+
+    local team = bot:GetTeam()
+    local teamKey = (team == DOTA_TEAM_GOODGUYS) and "radiant" or "dire"
+
+    -- Enemy picks and bans are not visible without PlayerResource, so pick
+    -- from the position pool and skip heroes this team already took.
+    local choice = HeroSelection:GetBestPick({}, {}, {})
+    if not choice then return end
+    if picked[teamKey] and picked[teamKey][choice] then
+        -- Taken by a teammate: fall back to the first hero in the pool.
+        local pool = POSITION_HEROES[GetBotPosition(bot)] or POSITION_HEROES[1]
+        for _, entry in ipairs(pool) do
+            if not (picked[teamKey] and picked[teamKey][entry.hero]) then
+                choice = entry.hero
+                break
+            end
+        end
+    end
+
+    if CommitPick(playerID, choice, teamKey) then
+        Say("-pick " .. ShortHeroName(choice))
+    end
+end
+
 function HeroSelection:Think()
     -- Initialize on first call
     if not phaseState.initialized then
@@ -314,9 +379,10 @@ function HeroSelection:Think()
     EnsureBotName(bot)
 
     -- GameRules and PlayerResource are nil in the bot script VM. Guard both.
-    if not GameRules then return end
-    if GameRules.State_Get == nil then return end
-    if not PlayerResource then return end
+    if not GameRules or GameRules.State_Get == nil or not PlayerResource then
+        FallbackPick(bot)
+        return
+    end
     
     local gameState = GameRules:State_Get()
     if gameState ~= DOTA_GAMERULES_STATE_HERO_SELECTION then
@@ -386,7 +452,9 @@ function HeroSelection:Think()
     elseif phase == "pick" then
         local pick = self:GetBestPick(humanRoles, enemyPicks, bannedHeroes)
         if pick then
-            Say("-pick " .. pick)
+            -- Lock the pick in, not just announce it.
+            CommitPick(playerID, pick, teamKey)
+            Say("-pick " .. ShortHeroName(pick))
             print("[HeroSelection] Picked: " .. pick)
         end
     end

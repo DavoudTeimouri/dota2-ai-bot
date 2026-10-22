@@ -3,6 +3,8 @@
 -- Engine contract: GetDesire() runs every frame for every mode file. nil falls
 -- back to Valve's desire; 0 opts out. This must stay below laning/farm/shop in
 -- ordinary conditions or every bot leaves lane permanently.
+local Compat = require("bot_compat")
+
 function GetDesire()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return 0 end
@@ -10,10 +12,10 @@ function GetDesire()
     -- Healthy: farming and laning beat this.
     if bot:GetHealth() < bot:GetMaxHealth() * 0.6 then return 0 end
 
-    local enemies = bot:GetNearbyEnemyHeroes(2000, true)
+    local enemies = Compat.Enemies(bot, 2000)
     if #enemies == 0 then return nil end
 
-    local allies = #bot:GetNearbyAlliedHeroes(2000)
+    local allies = #Compat.Allies(bot, 2000)
     if allies <= 1 then return nil end   -- never roam alone
 
     -- A real fight: both sides present and worth joining.
@@ -30,7 +32,7 @@ function Think()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
 
-    local enemies = bot:GetNearbyEnemyHeroes(2000, true)
+    local enemies = Compat.Enemies(bot, 2000)
     if #enemies == 0 then return end
 
     -- Weakest visible enemy first: focus fire beats scattering damage.
@@ -45,6 +47,13 @@ function Think()
     end
 
     if best then
-        bot:Action_AttackUnit(best)
+        Compat.Attack(bot, best)
     end
 end
+
+-- The engine calls the global GetDesire()/Think() above. Returning the table
+-- as well lets the module be required and tested without the engine.
+return {
+    GetDesire = GetDesire,
+    Think = Think,
+}

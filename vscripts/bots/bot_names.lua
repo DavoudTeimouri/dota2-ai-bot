@@ -111,9 +111,8 @@ end
 -- Set bot name (called during hero selection)
 function BotNames:SetBotName(bot, team)
     local name = self:GetForTeam(team)
-    if bot and not bot:IsNull() then
-        bot:SetBotName(name)
-    end
+    local Compat = require("bot_compat")
+    Compat.SetName(bot, name)
     return name
 end
 

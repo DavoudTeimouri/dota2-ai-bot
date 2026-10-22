@@ -8,6 +8,7 @@
 -- GetFarmAction(), neither of which the engine ever calls, so this mode could
 -- never activate.
 local BotLane = require("bot_lane")
+local Compat = require("bot_compat")
 
 local function NeutralTier(name)
     if name:find("ancient") then return 4 end
@@ -35,8 +36,7 @@ function GetDesire()
     elseif role == "support" then desire = desire - 0.1 end
 
     -- Nothing nearby to hit: farming has no target, let another mode run.
-    if not bot.GetNearbyNeutralCreeps then return nil end
-    if #bot:GetNearbyNeutralCreeps(1500) == 0 then return 0 end
+    if #Compat.NeutralCreeps(bot, 1500) == 0 then return 0 end
 
     return desire
 end
@@ -46,7 +46,7 @@ function Think()
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
 
     -- Neutral creeps first: highest tier available.
-    local neutrals = bot:GetNearbyNeutralCreeps(1500)
+    local neutrals = Compat.NeutralCreeps(bot, 1500)
     if #neutrals > 0 then
         local best, bestTier = nil, 0
         for _, creep in ipairs(neutrals) do
@@ -56,7 +56,7 @@ function Think()
             end
         end
         if best then
-            bot:AttackTarget(best)
+            Compat.Attack(bot, best)
             return
         end
     end
@@ -72,7 +72,7 @@ function Think()
             end
         end
         if best then
-            bot:AttackTarget(best)
+            Compat.Attack(bot, best)
             return
         end
     end
@@ -80,6 +80,13 @@ function Think()
     -- Nothing to hit anywhere: hold the lane front.
     local pos = BotLane.FrontLocation(bot, 0)
     if pos then
-        bot:Action_AttackMove(pos)
+        Compat.AttackMove(bot, pos)
     end
 end
+
+-- The engine calls the global GetDesire()/Think() above. Returning the table
+-- as well lets the module be required and tested without the engine.
+return {
+    GetDesire = GetDesire,
+    Think = Think,
+}

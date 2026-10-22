@@ -79,6 +79,7 @@ local NormalizeRole = ItemPurchase.NormalizeRole
 -- The bot's role, resolved through bot_lane so a VM without bot:GetRole()
 -- still picks the right build.
 local BotLane = require("bot_lane")
+local Compat = require("bot_compat")
 
 -- The build order for this bot, by role.
 function ItemPurchase:BuildFor(bot)
@@ -99,17 +100,7 @@ end
 -- How many copies the bot currently holds. HasItem() is only a boolean, so
 -- scan the inventory slots and count matching item names.
 local function OwnedCount(bot, item)
-    if not bot.GetItemInSlot then
-        return (bot:HasItem(item)) and 1 or 0
-    end
-    local n = 0
-    for s = 0, 8 do
-        local it = bot:GetItemInSlot(s)
-        if it and not it:IsNull() and it:GetName() == item then
-            n = n + 1
-        end
-    end
-    return n
+    return Compat.CountItem(bot, item)
 end
 
 -- Buy the first affordable, reachable item that the bot still needs a copy of.

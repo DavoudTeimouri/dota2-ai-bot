@@ -50,6 +50,17 @@ local function makeBot()
     }
 end
 
+-- A fake ability. Needs GetName, IsNull, IsFullyCastable and
+-- CanAbilityBeUpgraded for the ability-usage code to accept it.
+local function makeAbility(name)
+    return {
+        GetName = function() return name end,
+        IsNull = function() return false end,
+        IsFullyCastable = function() return true end,
+        CanAbilityBeUpgraded = function() return true end,
+    }
+end
+
 local fakeBot = makeBot()
 -- Action methods always exist in the Dota 2 bot VM. Add them so the probe
 -- finds real bugs rather than harness gaps.
@@ -288,6 +299,278 @@ do
 end
 
 print("")
+-- ============================================================================
+-- BUG 9: the API reference documents GetNearbyHeroes(radius, bEnemies, mode)
+-- but the standard bot scripts use GetNearbyEnemyHeroes / GetNearbyAlliedHeroes.
+-- Neither appears in the other, so the compat layer must support both.
+-- ============================================================================
+do
+    local Compat = require("bot_compat")
+
+    -- A fake enemy hero. A table holding nil has length 0, so the fixture
+    -- must be a real table.
+    local function makeEnemy()
+        return {
+            IsNull = function() return false end,
+            IsAlive = function() return true end,
+            GetHealth = function() return 300 end,
+            GetMaxHealth = function() return 600 end,
+            GetAbsOrigin = function() return { x = 500, y = 0, z = 0 } end,
+            GetLocation = function() return { x = 500, y = 0, z = 0 } end,
+        }
+    end
+
+    -- A bot exposing ONLY the documented API.
+    local documented = makeBot()
+    documented.GetNearbyHeroes = function(self, radius, enemies)
+        return { makeEnemy() }
+    end
+    documented.GetNearbyEnemyHeroes = nil
+    documented.GetNearbyAlliedHeroes = nil
+
+    check("compat: Enemies() works with only GetNearbyHeroes",
+        #Compat.Enemies(documented, 1200) == 1)
+    check("compat: Allies() works with only GetNearbyHeroes",
+        #Compat.Allies(documented, 1200) == 1)
+
+    -- A bot exposing ONLY the older API.
+    local legacy = makeBot()
+    legacy.GetNearbyEnemyHeroes = function() return { makeEnemy() } end
+    legacy.GetNearbyAlliedHeroes = function() return { makeEnemy() } end
+    legacy.GetNearbyHeroes = nil
+
+    check("compat: Enemies() works with only GetNearbyEnemyHeroes",
+        #Compat.Enemies(legacy, 1200) == 1)
+    check("compat: Allies() works with only GetNearbyAlliedHeroes",
+        #Compat.Allies(legacy, 1200) == 1)
+
+    -- A bot exposing NEITHER must not raise.
+    local bare = makeBot()
+    bare.GetNearbyHeroes = nil
+    bare.GetNearbyEnemyHeroes = nil
+    bare.GetNearbyAlliedHeroes = nil
+    local ok, err = pcall(function()
+        return Compat.Enemies(bare, 1200), Compat.Allies(bare, 1200)
+    end)
+    check("compat: no hero query at all returns empty, never raises", ok, tostring(err))
+
+    -- Position: GetAbsOrigin (older) vs GetLocation (documented).
+    local posOld = makeBot()
+    posOld.GetAbsOrigin = function() return { x = 11, y = 22 } end
+    posOld.GetLocation = nil
+    local posNew = makeBot()
+    posNew.GetLocation = function() return { x = 11, y = 22 } end
+    posNew.GetAbsOrigin = nil
+    local p1 = Compat.Position(posOld)
+    local p2 = Compat.Position(posNew)
+    check("compat: Position() works with either GetAbsOrigin or GetLocation",
+        p1 and p2 and p1.x == p2.x and p1.x == 11)
+
+    -- HasItem: bot:HasItem (older) vs inventory scan (documented).
+    local hasOld = makeBot()
+    hasOld.HasItem = function(self, name) return name == "item_tango" end
+    local hasNew = makeBot()
+    hasNew.HasItem = nil
+    hasNew.GetItemInSlot = function(self, s)
+        if s == 0 then
+            return { IsNull = function() return false end,
+                     GetName = function() return "item_tango" end }
+        end
+        return nil
+    end
+    check("compat: HasItem() works with either bot:HasItem or an inventory scan",
+        Compat.HasItem(hasOld, "item_tango")
+        and Compat.HasItem(hasNew, "item_tango")
+        and not Compat.HasItem(hasNew, "item_blink"))
+
+    -- Abilities: GetAbilityInSlot (documented) vs GetAbilityByIndex (older).
+    local abNew = makeBot()
+    abNew.GetAbilityInSlot = function() return makeAbility("miasma") end
+    abNew.GetAbilityByIndex = nil
+    local abOld = makeBot()
+    abOld.GetAbilityByIndex = function() return makeAbility("miasma") end
+    abOld.GetAbilityInSlot = nil
+    check("compat: AbilityInSlot() works with either spelling",
+        Compat.AbilityInSlot(abNew, 0) ~= nil
+        and Compat.AbilityInSlot(abOld, 0) ~= nil)
+end
+
+-- ============================================================================
+-- BUG 10: the ultimate must beat a normal spell when it is worth using.
+-- ============================================================================
+do
+    local AbilityUsage = require("ability_item_usage_generic")
+
+    local ultimate = makeAbility("antimage_chronosphere")
+    ultimate.IsUltimate = function() return true end
+
+    local normal = makeAbility("miasma")
+    normal.IsUltimate = function() return false end
+
+    -- Slot 0 is the normal spell, slot 1 is the ultimate.
+    local ultBot = makeBot()
+    ultBot.GetAbilityByIndex = function(self, i)
+        if i == 0 then return normal end
+        if i == 1 then return ultimate end
+        return nil
+    end
+    ultBot.GetNearbyEnemyHeroes = function()
+        return {
+            { IsNull = function() return false end,
+              IsAlive = function() return true end,
+              GetHealth = function() return 300 end,
+              GetMaxHealth = function() return 600 end,
+              GetAbsOrigin = function() return { x = 500, y = 0, z = 0 } end },
+            { IsNull = function() return false end,
+              IsAlive = function() return true end,
+              GetHealth = function() return 300 end,
+              GetMaxHealth = function() return 600 end,
+              GetAbsOrigin = function() return { x = 600, y = 0, z = 0 } end },
+        }
+    end
+    ultBot.GetAbsOrigin = function() return { x = 0, y = 0, z = 0 } end
+
+    local chosen, _ = AbilityUsage:GetAbilityUsage(ultBot)
+    check("ability usage: a worth-it ultimate is preferred over a normal spell",
+        chosen ~= nil and chosen:GetName() == "antimage_chronosphere",
+        chosen and chosen:GetName() or "nil")
+
+    -- With a single healthy enemy the ultimate must NOT be forced.
+    local healthy = makeAbility("antimage_chronosphere")
+    healthy.IsUltimate = function() return true end
+    local soloBot = makeBot()
+    soloBot.GetAbilityByIndex = function(self, i)
+        if i == 0 then return normal end
+        if i == 1 then return healthy end
+        return nil
+    end
+    soloBot.GetNearbyEnemyHeroes = function()
+        return { { IsNull = function() return false end,
+                   IsAlive = function() return true end,
+                   GetHealth = function() return 600 end,
+                   GetMaxHealth = function() return 600 end,
+                   GetAbsOrigin = function() return { x = 500, y = 0, z = 0 } end } }
+    end
+    soloBot.GetAbsOrigin = function() return { x = 0, y = 0, z = 0 } end
+    local chosen2, _ = AbilityUsage:GetAbilityUsage(soloBot)
+    check("ability usage: ultimate is not forced on a single healthy enemy",
+        chosen2 ~= nil and chosen2:GetName() == "miasma",
+        chosen2 and chosen2:GetName() or "nil")
+end
+
+-- ============================================================================
+-- BUG 11: hero selection announced "-pick" in chat but never called
+-- SelectHero(), and bailed out entirely when GameRules is missing. A bot
+-- without a hero never moves and never buys anything.
+-- ============================================================================
+do
+    local HeroSelection = require("hero_selection")
+
+    -- Save and restore the globals this test replaces.
+    local savedRules = _G.GameRules
+    local savedResource = _G.PlayerResource
+    local savedSelect = _G.SelectHero
+    local savedControl = _G.IsPlayerInHeroSelectionControl
+
+    local selected = {}
+    _G.GameRules = nil
+    _G.PlayerResource = nil
+    _G.SelectHero = function(playerID, heroName)
+        selected[#selected + 1] = { id = playerID, hero = heroName }
+    end
+    _G.IsPlayerInHeroSelectionControl = function(playerID) return true end
+
+    -- The fake bot reports player id 0, team 2 (Radiant).
+    HeroSelection:Think()
+
+    check("hero selection: SelectHero() is called when GameRules is missing",
+        #selected == 1, "calls=" .. #selected)
+    check("hero selection: the hero name is the short name, not the unit name",
+        #selected == 1
+            and not selected[1].hero:find("npc_dota_hero_")
+            and #selected[1].hero > 0,
+        #selected == 1 and selected[1].hero or "no call")
+
+    -- Not our turn: no pick.
+    selected = {}
+    _G.IsPlayerInHeroSelectionControl = function() return false end
+    HeroSelection:Think()
+    check("hero selection: no pick when the bot does not control the selection",
+        #selected == 0, "calls=" .. #selected)
+
+    _G.GameRules = savedRules
+    _G.PlayerResource = savedResource
+    _G.SelectHero = savedSelect
+    _G.IsPlayerInHeroSelectionControl = savedControl
+end
+
+-- ============================================================================
+-- BUG 12: the API reference documents ActionImmediate_LevelAbility(name),
+-- but the code called ActionImmediate_LevelUpAbility(handle), which the
+-- reference never mentions. The bot never levelled an ability.
+-- ============================================================================
+do
+    local Compat = require("bot_compat")
+
+    local leveled = {}
+    local levBot = makeBot()
+    levBot.ActionImmediate_LevelAbility = function(self, name)
+        leveled[#leveled + 1] = name
+    end
+    levBot.ActionImmediate_LevelUpAbility = nil
+
+    local ab = makeAbility("antimage_blink")
+    Compat.LevelAbility(levBot, ab)
+    check("compat: LevelAbility() uses the documented ActionImmediate_LevelAbility",
+        #leveled == 1 and leveled[1] == "antimage_blink",
+        #leveled == 1 and tostring(leveled[1]) or "not called")
+
+    -- Older shape: the handle-based call, with no name-based call available.
+    local leveled2 = {}
+    local levBot2 = makeBot()
+    levBot2.ActionImmediate_LevelAbility = nil
+    levBot2.ActionImmediate_LevelUpAbility = function(self, handle)
+        leveled2[#leveled2 + 1] = handle
+    end
+    Compat.LevelAbility(levBot2, ab)
+    check("compat: LevelAbility() falls back to ActionImmediate_LevelUpAbility",
+        #leveled2 == 1)
+
+    -- Casting: the target kind picks the right action.
+    local cast = {}
+    local castBot = makeBot()
+    castBot.Action_UseAbility = function(self, a) cast[#cast + 1] = "none" end
+    castBot.Action_UseAbilityOnEntity = function(self, a, t) cast[#cast + 1] = "entity" end
+    castBot.Action_UseAbilityOnLocation = function(self, a, t) cast[#cast + 1] = "location" end
+
+    Compat.UseAbility(castBot, ab, nil)
+    local unit = { IsNull = function() return false end, GetHealth = function() return 1 end }
+    Compat.UseAbility(castBot, ab, unit)
+    Compat.UseAbility(castBot, ab, { x = 1, y = 2 })
+    check("compat: UseAbility() picks none / entity / location by target kind",
+        cast[1] == "none" and cast[2] == "entity" and cast[3] == "location",
+        table.concat(cast, ","))
+
+    -- Neutral item: the API documents slot 16.
+    local neutralBot = makeBot()
+    neutralBot.GetItemInSlot = function(self, slot)
+        if slot == 16 then
+            return { IsNull = function() return false end,
+                     GetName = function() return "item_tome_of_knowledge" end,
+                     IsFullyCastable = function() return true end }
+        end
+        return nil
+    end
+    local neutral = Compat.NeutralItem(neutralBot)
+    check("compat: NeutralItem() reads slot 16",
+        neutral ~= nil and neutral:GetName() == "item_tome_of_knowledge")
+
+    local noNeutral = makeBot()
+    noNeutral.GetItemInSlot = function() return nil end
+    check("compat: NeutralItem() returns nil when the slot is empty",
+        Compat.NeutralItem(noNeutral) == nil)
+end
+
 if failures == 0 then
     print("ALL PASS")
 else

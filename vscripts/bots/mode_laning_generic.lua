@@ -8,6 +8,7 @@
 -- Lane roles. Support needs to leave lane to pull and ward, so its desire
 -- drops off as soon as it has something to do.
 local BotLane = require("bot_lane")
+local Compat = require("bot_compat")
 
 local function IsReadyToFarm(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return false end
@@ -55,7 +56,7 @@ function Think()
         end
         -- Clean last hit available: take it.
         if best then
-            bot:AttackTarget(best)
+            Compat.Attack(bot, best)
             return
         end
 
@@ -71,7 +72,7 @@ function Think()
                 end
             end
             if bestDeny then
-                bot:AttackTarget(bestDeny)
+                Compat.Attack(bot, bestDeny)
                 return
             end
         end
@@ -80,6 +81,13 @@ function Think()
     -- Nothing to hit: walk to the front of our lane.
     local pos = BotLane.FrontLocation(bot, 0)
     if pos then
-        bot:Action_AttackMove(pos)
+        Compat.AttackMove(bot, pos)
     end
 end
+
+-- The engine calls the global GetDesire()/Think() above. Returning the table
+-- as well lets the module be required and tested without the engine.
+return {
+    GetDesire = GetDesire,
+    Think = Think,
+}
