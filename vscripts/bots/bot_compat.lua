@@ -307,17 +307,6 @@ function Compat.NeutralItem(bot)
     return item
 end
 
--- Position along the lane: 0 = your ancient, 1 = the enemy ancient.
-function Compat.LaneAmount(bot)
-    if not bot or bot:IsNull() then return 0.5 end
-    if bot.GetAmountAlongLane and bot.GetAssignedLane then
-        local lane = bot:GetAssignedLane()
-        local ok, amount = pcall(bot.GetAmountAlongLane, bot, lane)
-        if ok and amount then return amount end
-    end
-    return 0.5
-end
-
 -- LANE_TOP = 1, LANE_MID = 2, LANE_BOT = 3. The lane constants are absolute:
 -- they name a side of the map, not a side for a given team.
 local LANE_TOP, LANE_MID, LANE_BOT = 1, 2, 3

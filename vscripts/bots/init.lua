@@ -416,33 +416,20 @@ function AetherWeaverMessages.get_contextual(key, ...)
     return msg
 end
 
+-- The message table is keyed by display name; the game hands out internal
+-- unit names. Only a few differ.
+local HERO_ALIAS = {
+    antimage = "anti_mage",
+}
+
 function AetherWeaverMessages.get_hero_line(hero_name)
-    local hero_table = AetherWeaverMessages.hero_specific[string.lower(hero_name)]
+    if not hero_name then return nil end
+    local short = string.lower(hero_name)
+    short = string.gsub(short, "^npc_dota_hero_", "")
+    short = HERO_ALIAS[short] or short
+    local hero_table = AetherWeaverMessages.hero_specific[short]
     if not hero_table or #hero_table == 0 then return nil end
     return hero_table[math.random(#hero_table)]
-end
-
-function AetherWeaverMessages.get_chat_wheel()
-    return AetherWeaverMessages.get_random("chat_wheel")
-end
-
-function AetherWeaverMessages.get_weighted(category, weights)
-    local list = AetherWeaverMessages[category]
-    if not list or #list == 0 then return nil end
-    weights = weights or {}
-    local total_weight = 0
-    for i = 1, #list do
-        total_weight = total_weight + (weights[i] or 1)
-    end
-    local rand = math.random() * total_weight
-    local cumulative = 0
-    for i = 1, #list do
-        cumulative = cumulative + (weights[i] or 1)
-        if rand <= cumulative then
-            return list[i]
-        end
-    end
-    return list[#list]
 end
 
 
@@ -523,7 +510,18 @@ function AetherWeaver:BotThink()
     -- Contextual line every 60s.
     if now >= self.nextContextual then
         self.nextContextual = now + 60.0
-        MaybeSay(AetherWeaverMessages.get_contextual(
+        -- Every third minute, comment on the hero this bot is playing.
+        -- The message table is keyed by display name; the unit name is
+        -- internal, so the lookup goes through the alias map.
+        local heroLine = nil
+        local bot = GetBot()
+        if bot and not bot:IsNull() and bot.GetUnitName then
+            local ok, unitName = pcall(bot.GetUnitName, bot)
+            if ok and unitName and math.random(3) == 1 then
+                heroLine = AetherWeaverMessages.get_hero_line(unitName)
+            end
+        end
+        MaybeSay(heroLine or AetherWeaverMessages.get_contextual(
             string.format("min_%d", math.floor(now / 60))))
     end
 
@@ -609,6 +607,9 @@ function AetherWeaver:MaintainLane(bot)
         BotLane.Set(bot, late)
     end
 end
+
+-- The message library, exported so it can be reached and tested.
+AetherWeaver.messages = AetherWeaverMessages
 
 -- Timers:CreateTimer and GameRules are nil in the bot VM; anything that needed
 -- them was removed. Periodic work uses the DotaTime diffs in BotThink().

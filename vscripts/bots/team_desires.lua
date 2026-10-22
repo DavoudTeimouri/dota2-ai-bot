@@ -541,19 +541,6 @@ function TeamDesires:GetDesire(desireType)
     return desireState.values[desireType] or 0
 end
 
--- Get highest priority desire
-function TeamDesires:GetHighestDesire()
-    local maxDesire = 0
-    local maxType = DESIRE_TYPES.FARM
-    for dtype, value in pairs(desireState.values) do
-        if value > maxDesire then
-            maxDesire = value
-            maxType = dtype
-        end
-    end
-    return maxType, maxDesire
-end
-
 -- Main Think function called by Dota 2
 function TeamDesires:Think()
     -- Initialize on first call

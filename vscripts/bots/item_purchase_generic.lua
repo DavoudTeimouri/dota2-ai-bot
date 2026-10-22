@@ -57,6 +57,40 @@ ItemPurchase.BUILDS = {
     },
 }
 
+-- The price of an item, read from the live game data. The build list keeps
+-- a fallback number so a build still works on a VM without the query; a
+-- wrong fallback only delays a purchase.
+function ItemPurchase:CostFor(item, fallback)
+    if GetItemCost then
+        local ok, cost = pcall(GetItemCost, item)
+        if ok and cost and cost > 0 then return cost end
+    end
+    return fallback
+end
+
+-- The shop that sells an item, read from the live game data. An item that
+-- moves between shops in a patch needs no code change here.
+function ItemPurchase:ShopFor(item, fallback)
+    if IsItemPurchasedFromSecretShop then
+        local ok, secret = pcall(IsItemPurchasedFromSecretShop, item)
+        if ok and secret then return "secret" end
+    end
+    if IsItemPurchasedFromSideShop then
+        local ok, side = pcall(IsItemPurchasedFromSideShop, item)
+        if ok and side then return "side" end
+    end
+    return fallback
+end
+
+-- Is the item in stock? Some items (observer wards, gems) have a limited
+-- stock, and trying to buy an empty shelf is a wasted call.
+function ItemPurchase:InStock(item)
+    if not GetItemStockCount then return true end
+    local ok, stock = pcall(GetItemStockCount, item)
+    if not ok or stock == nil then return true end
+    return stock > 0
+end
+
 -- Secret shop items can only be bought when standing at it; keep the mapping
 -- explicit so a wrong answer is a skipped purchase, not an error.
 local function AtShop(bot, shop)
@@ -81,8 +115,18 @@ local NormalizeRole = ItemPurchase.NormalizeRole
 local BotLane = require("bot_lane")
 local Compat = require("bot_compat")
 
--- The build order for this bot, by role.
+-- The build order for this bot: the hero's own build when it has one,
+-- otherwise the build for its role.
 function ItemPurchase:BuildFor(bot)
+    local HeroBuilds = require("hero_builds")
+
+    if bot and not bot:IsNull() and bot.GetUnitName then
+        local ok, unitName = pcall(bot.GetUnitName, bot)
+        if ok and unitName then
+            local build = HeroBuilds.For(unitName)
+            if build then return build end
+        end
+    end
     return self.BUILDS[NormalizeRole(BotLane.GetRole(bot))]
 end
 
@@ -116,14 +160,18 @@ function ItemPurchase:PurchaseItem(bot)
     local build = self:BuildFor(bot)
     for _, entry in ipairs(build) do
         local item, minGold, shop = entry[1], entry[2], entry[3]
+        local cost = self:CostFor(item, minGold)
+        local at = self:ShopFor(item, shop)
         -- Must be standing at that shop; elsewhere the purchase silently fails.
-        if gold >= minGold and AtShop(bot, shop) then
+        if gold >= cost and AtShop(bot, at) then
             -- Only buy while we still need a copy: the build may list the same
             -- item several times (two tangos, three wards) and a boolean
             -- HasItem() would stop after the first one.
             if OwnedCount(bot, item) < DesiredCount(build, item) then
-                if bot:ActionImmediate_PurchaseItem(item) == PURCHASE_ITEM_SUCCESS then
-                    return true
+                if self:InStock(item) then
+                    if bot:ActionImmediate_PurchaseItem(item) == PURCHASE_ITEM_SUCCESS then
+                        return true
+                    end
                 end
             end
         end
@@ -142,8 +190,12 @@ function ItemPurchase:NeedsToShop(bot)
     local build = self:BuildFor(bot)
     for _, entry in ipairs(build) do
         local item, minGold, shop = entry[1], entry[2], entry[3]
-        if gold >= minGold and OwnedCount(bot, item) < DesiredCount(build, item) then
-            return not AtShop(bot, shop)
+        local cost = self:CostFor(item, minGold)
+        local at = self:ShopFor(item, shop)
+        if gold >= cost and OwnedCount(bot, item) < DesiredCount(build, item) then
+            if self:InStock(item) then
+                return not AtShop(bot, at)
+            end
         end
     end
     return false
@@ -159,8 +211,12 @@ function ItemPurchase:GetNextPurchase(bot)
     local build = self:BuildFor(bot)
     for _, entry in ipairs(build) do
         local item, minGold, shop = entry[1], entry[2], entry[3]
-        if gold >= minGold and OwnedCount(bot, item) < DesiredCount(build, item) then
-            return item, shop
+        local cost = self:CostFor(item, minGold)
+        local at = self:ShopFor(item, shop)
+        if gold >= cost and OwnedCount(bot, item) < DesiredCount(build, item) then
+            if self:InStock(item) then
+                return item, at
+            end
         end
     end
     return nil

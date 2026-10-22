@@ -44,6 +44,8 @@ function GetDesire()
 
     -- Only wards with something to plant.
     if not HasObserver(bot) then return nil end
+    -- The item can be in the inventory with its charges already used up.
+    if Compat.AvailableWards(bot) <= 0 then return nil end
 
     -- Very low HP: warding gets you killed, retreat should win.
     if bot:GetHealth() < bot:GetMaxHealth() * 0.35 then return 0 end
