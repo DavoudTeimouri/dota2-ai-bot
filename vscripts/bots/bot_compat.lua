@@ -29,6 +29,51 @@
 
 local Compat = {}
 
+-- Action counters. The diagnostics report prints how many of each happened
+-- since the last report, which is the only honest way to tell whether the
+-- bot is acting or just standing there.
+Compat.stats = { moves = 0, attacks = 0, casts = 0, levels = 0, purchases = 0 }
+
+-- Reset the counters and return the totals.
+function Compat.TakeStats()
+    local out = {}
+    for k, v in pairs(Compat.stats) do out[k] = v end
+    for k in pairs(Compat.stats) do Compat.stats[k] = 0 end
+    return out
+end
+
+-- Which of two API shapes is present. Returns "new", "old" or "none".
+local function Which(newName, oldName)
+    if newName then return "new" end
+    if oldName then return "old" end
+    return "none"
+end
+
+-- The API shape the VM actually implements, for the diagnostics report.
+function Compat.ApiShape()
+    return {
+        heroQuery = Which(_G.GetNearbyHeroes, _G.GetNearbyEnemyHeroes),
+        position = Which(_G.GetLocation, _G.GetAbsOrigin),
+        abilitySlot = Which(_G.GetAbilityInSlot, _G.GetAbilityByIndex),
+        levelUp = Which(_G.ActionImmediate_LevelAbility, _G.ActionImmediate_LevelUpAbility),
+        courier = Which(_G.GetCourier, _G.GetCourier),
+        itemCost = _G.GetItemCost and "yes" or "no",
+        itemShop = (_G.IsItemPurchasedFromSecretShop or _G.IsItemPurchasedFromSideShop) and "yes" or "no",
+        itemStock = _G.GetItemStockCount and "yes" or "no",
+        roshan = _G.GetRoshanKillTime and "yes" or "no",
+        glyph = _G.GetGlyphCooldown and "yes" or "no",
+        tower = _G.GetTower and "yes" or "no",
+        selectHero = _G.SelectHero and "yes" or "no",
+        pickControl = _G.IsPlayerInHeroSelectionControl and "yes" or "no",
+        pickState = _G.GetHeroPickState and "yes" or "no",
+        cmBan = _G.IsCMBannedHero and "yes" or "no",
+        teamPlayers = _G.GetTeamPlayers and "yes" or "no",
+        isPlayerBot = _G.IsPlayerBot and "yes" or "no",
+        netWorth = _G.GetNetWorth and "yes" or "no",
+        courierAction = _G.COURIER_ACTION_TAKE_AND_TRANSFER_ITEMS and "yes" or "no",
+    }
+end
+
 -- Bot mode filter meaning "all heroes", whatever the VM calls it.
 local MODE_ALL = _G.BOT_MODE_NONE or 0
 
@@ -165,10 +210,12 @@ function Compat.Attack(bot, unit)
     if not bot or bot:IsNull() or not unit then return false end
     if bot.Action_AttackUnit then
         bot:Action_AttackUnit(unit)
+        Compat.stats.attacks = Compat.stats.attacks + 1
         return true
     end
     if bot.AttackTarget then
         bot:AttackTarget(unit)
+        Compat.stats.attacks = Compat.stats.attacks + 1
         return true
     end
     return false
@@ -179,6 +226,7 @@ function Compat.AttackMove(bot, location)
     if not bot or bot:IsNull() or not location then return false end
     if bot.Action_AttackMove then
         bot:Action_AttackMove(location)
+        Compat.stats.moves = Compat.stats.moves + 1
         return true
     end
     return false
@@ -199,13 +247,19 @@ function Compat.LevelAbility(bot, ability)
         end
         if name then
             local ok = pcall(bot.ActionImmediate_LevelAbility, bot, name)
-            if ok then return true end
+            if ok then
+                Compat.stats.levels = Compat.stats.levels + 1
+                return true
+            end
         end
     end
 
     if bot.ActionImmediate_LevelUpAbility then
         local ok = pcall(bot.ActionImmediate_LevelUpAbility, bot, ability)
-        if ok then return true end
+        if ok then
+            Compat.stats.levels = Compat.stats.levels + 1
+            return true
+        end
     end
     return false
 end
@@ -216,10 +270,12 @@ function Compat.MoveTo(bot, location)
     if not bot or bot:IsNull() or not location then return false end
     if bot.Action_MoveToLocation then
         bot:Action_MoveToLocation(location)
+        Compat.stats.moves = Compat.stats.moves + 1
         return true
     end
     if bot.Action_MoveDirectly then
         bot:Action_MoveDirectly(location)
+        Compat.stats.moves = Compat.stats.moves + 1
         return true
     end
     return false
@@ -235,6 +291,7 @@ function Compat.UseAbility(bot, ability, target)
     if target == nil then
         if bot.Action_UseAbility then
             bot:Action_UseAbility(ability)
+            Compat.stats.casts = Compat.stats.casts + 1
             return true
         end
         return false
@@ -245,6 +302,7 @@ function Compat.UseAbility(bot, ability, target)
     if target.GetHealth or target.IsNull then
         if bot.Action_UseAbilityOnEntity then
             bot:Action_UseAbilityOnEntity(ability, target)
+            Compat.stats.casts = Compat.stats.casts + 1
             return true
         end
         return false
@@ -252,6 +310,7 @@ function Compat.UseAbility(bot, ability, target)
 
     if bot.Action_UseAbilityOnLocation then
         bot:Action_UseAbilityOnLocation(ability, target)
+        Compat.stats.casts = Compat.stats.casts + 1
         return true
     end
     return false

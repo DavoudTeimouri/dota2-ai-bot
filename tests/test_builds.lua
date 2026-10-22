@@ -213,6 +213,49 @@ check("chat: a hero with no lines returns nil",
 check("chat: a hero with lines is found by its own name",
     Messages.get_hero_line("npc_dota_hero_invoker") ~= nil)
 
+-- ============================================================================
+-- The diagnostics report.
+-- ============================================================================
+local Diagnostics = require("diagnostics")
+
+-- Capture what the report prints.
+local captured = {}
+local realPrint = print
+print = function(...)
+    local parts = {}
+    for i = 1, select("#", ...) do parts[#parts + 1] = tostring(select(i, ...)) end
+    captured[#captured + 1] = table.concat(parts, " ")
+end
+local ok, err = pcall(function() Diagnostics:Report() end)
+print = realPrint
+
+check("diagnostics: the report runs without raising", ok, tostring(err))
+
+local report = table.concat(captured, "\n")
+check("diagnostics: the report has an API shape section",
+    report:find("API shape", 1, true) ~= nil)
+check("diagnostics: the report has a bot section",
+    report:find("--- bot ---", 1, true) ~= nil)
+check("diagnostics: the report has a team section",
+    report:find("--- team ---", 1, true) ~= nil)
+check("diagnostics: the report has an actions section",
+    report:find("actions since the last report", 1, true) ~= nil)
+check("diagnostics: the report names the hero",
+    report:find("antimage", 1, true) ~= nil)
+
+-- The counters must actually count.
+local Compat = require("bot_compat")
+Compat.stats.moves = 0
+Compat.stats.purchases = 0
+bot.Action_MoveToLocation = function(self, loc) end
+local ItemPurchase2 = require("item_purchase_generic")
+-- Give the bot enough gold and let it buy.
+gold = 3000
+inventory = {}
+ItemPurchase2:PurchaseItem(bot)
+check("diagnostics: a purchase is counted",
+    Compat.stats.purchases == 1, tostring(Compat.stats.purchases))
+
 if failures == 0 then
     print("ALL PASS")
 else

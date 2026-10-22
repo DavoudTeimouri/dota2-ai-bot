@@ -72,6 +72,7 @@ dota2-ai-bot/
         ├── bot_lane.lua                     # Lane constants + role resolution helper
         ├── bot_names.lua                    # Human‑like name pool (EN/ZH/KO/RU/ES)
         ├── courier_generic.lua              # Courier logic (the hook is in the ability file)
+        ├── diagnostics.lua                  # Console report: API shape, state, actions
         ├── hero_builds.lua                  # Per‑hero item build overrides
         ├── hero_rules.lua                   # Per‑hero ultimate rule + level order
         ├── hero_selection.lua               # Hero pick/ban phase (SelectHero) + naming
@@ -133,6 +134,57 @@ You can test the bot in a local lobby using the **Local DevScript** option:
    assuming the bot folder is mounted at `vscripts/` relative to the game.
 4. The bot will load and you should see its name and initial chat messages.
 5. Use `script_reload` to iterate on changes without restarting the lobby.
+
+### Verifying it in the lobby
+The bot prints a **diagnostics report** into the console: once at the horn and
+then every 30 seconds. It is the fastest way to tell a working bot from a
+bot that is standing still.
+
+```
+=========================================================
+ AetherWeaver diagnostics    t=300
+=========================================================
+--- API shape ---
+[heroQuery] new
+[position] new
+[levelUp] new
+[selectHero] yes
+...
+--- bot ---
+[hero] npc_dota_hero_antimage
+[role] carry
+[lane] 3
+[gold] 600
+[atFountain] true
+--- team ---
+[push.top] 0.12
+[defend.bot] 0.44
+[roam] 0.00
+[roshan] 0.00
+[enemies] 5
+[enemiesHuman] 1
+--- actions since the last report ---
+[moves] 18
+[attacks] 4
+[casts] 7
+[levels] 1
+[purchases] 2
+=========================================================
+```
+
+What to look at:
+
+| Line | What it means when it is wrong |
+|---|---|
+| `[heroQuery] none` | The bot cannot see enemies. Nothing else will work until the hero query shape is right. |
+| `[hero] nil` | The bot has no hero, so it cannot move or buy. The pick never happened. |
+| `[moves] 0` | The bot is not moving. Check `[atFountain]` and the team desires below it. |
+| `[purchases] 0` | The bot is not buying. It has to be standing at the shop: check `[atFountain]`. |
+| `[levels] 0` with `[abilityPoints] > 0` | The ability level-up call is not the shape the VM wants. |
+| `[push.*] err` | The engine did not call `UpdatePushLaneDesires()`, so the team has no plan. |
+
+Paste the report back and it says exactly what is wrong, without guessing
+from the bot's behaviour in the game.
 
 ## Chat Commands
 Not supported. The bot scripting VM has no `player_chat` event and no

@@ -170,6 +170,7 @@ function ItemPurchase:PurchaseItem(bot)
             if OwnedCount(bot, item) < DesiredCount(build, item) then
                 if self:InStock(item) then
                     if bot:ActionImmediate_PurchaseItem(item) == PURCHASE_ITEM_SUCCESS then
+                        Compat.stats.purchases = Compat.stats.purchases + 1
                         return true
                     end
                 end

@@ -442,6 +442,7 @@ end
 local HeroSelection = require("hero_selection")
 local TeamDesires = require("team_desires")
 local BotLane = require("bot_lane")
+local Diagnostics = require("diagnostics")
 
 local AetherWeaver = {}
 
@@ -539,6 +540,11 @@ function AetherWeaver:BotThink()
 
     -- Hero selection owns naming; it runs in its own file scope.
     HeroSelection:Think()
+
+    -- The diagnostics report: what the VM implements, what the bot thinks
+    -- its state is, and what it actually did since the last report. It is
+    -- what a lobby test needs to be read from.
+    Diagnostics:Think()
 end
 
 -- Nudge the assigned lane to match role only when it is clearly wrong.
