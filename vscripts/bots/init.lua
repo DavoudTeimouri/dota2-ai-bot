@@ -454,8 +454,18 @@ end
 -- need PlayerResource/GameRules, which are nil in this VM.
 local HeroSelection = require("hero_selection")
 local TeamDesires = require("team_desires")
+local BotLane = require("bot_lane")
 
 local AetherWeaver = {}
+
+-- Periodic-work schedule (game time at which each job is next due).
+-- These MUST start at 0, not nil: BotThink() compares them with `now`, and
+-- comparing a number with nil raises "attempt to compare number with nil",
+-- which killed BotThink() on every frame.
+AetherWeaver.nextChatter = 0
+AetherWeaver.nextContextual = 0
+AetherWeaver.nextDecision = 0
+AetherWeaver.greeted = false
 
 -- ============================================================================
 -- BOT STATE
@@ -500,7 +510,10 @@ function AetherWeaver:BotThink()
             or "Ready to farm. Try not to feed.")
     end
 
-    -- Chit-chat every 15s.
+    -- Chit-chat every 15s. nextChatter/nextContextual/nextDecision start at 0
+    -- so the first tick fires them; they MUST be initialised, because
+    -- comparing a number with nil raises "attempt to compare number with nil"
+    -- and would kill BotThink() on every single frame.
     if now >= self.nextChatter then
         self.nextChatter = now + 15.0
         local categories = { "funny_lines", "self_deprecating", "tactical_alerts" }
@@ -533,17 +546,20 @@ end
 -- Nudge the assigned lane to match role only when it is clearly wrong.
 -- Movement, buying, casting, warding and runes are handled by the mode files
 -- and the ability/item hooks, not from here.
+--
+-- Lanes are int constants in the bot API (LANE_TOP/MID/BOT), and the safe and
+-- offlane depend on which team the bot is on.
 function AetherWeaver:MaintainLane(bot)
-    local lane = bot:GetAssignedLane()
-    local role = bot:GetRole()
+    local role = BotLane.GetRole(bot)
+    local team = bot:GetTeam()
     local want
-    if role == "carry" then want = "safe"
-    elseif role == "mid" then want = "mid"
-    elseif role == "offlane" then want = "off"
-    elseif role == "support" then want = "safe"
+    if role == "carry" then want = BotLane.SafeLaneForTeam(team)
+    elseif role == "mid" then want = BotLane.LANE_MID
+    elseif role == "offlane" then want = BotLane.OffLaneForTeam(team)
+    elseif role == "support" then want = BotLane.SafeLaneForTeam(team)
     end
-    if want and lane ~= want then
-        bot:SetAssignedLane(want)
+    if want and BotLane.GetAssigned(bot) ~= want then
+        BotLane.Set(bot, want)
     end
 end
 

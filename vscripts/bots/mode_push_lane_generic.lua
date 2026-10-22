@@ -3,6 +3,8 @@
 -- Engine contract: GetDesire() runs every frame for every mode file. nil falls
 -- back to Valve's desire; 0 opts out. This must stay below retreat so a hurt
 -- bot never pushes, and above laning only when the numbers justify it.
+local BotLane = require("bot_lane")
+
 local function CountAllies(bot)
     if not bot.GetNearbyAlliedHeroes then return 0 end
     return #bot:GetNearbyAlliedHeroes(1800)
@@ -40,13 +42,13 @@ function Think()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
 
-    local lane = (bot.GetAssignedLane and bot:GetAssignedLane()) or "safe"
-
     -- Push to the far end of our lane, where the enemy tower is.
-    local pos = GetLaneFrontLocation(GetTeam(), lane, 1000)
+    local pos = BotLane.FrontLocation(bot, 1000)
     if not pos then
         -- Lane name unknown to the map helper: fall back to mid.
-        pos = GetLaneFrontLocation(GetTeam(), "mid", 1000)
+        if GetLaneFrontLocation then
+            pos = GetLaneFrontLocation(bot:GetTeam(), BotLane.LANE_MID, 1000)
+        end
     end
     if pos then
         bot:Action_AttackMove(pos)

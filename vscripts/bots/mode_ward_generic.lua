@@ -7,17 +7,19 @@ local function HasObserver(bot)
     return bot:HasItem("item_ward_observer") or bot:HasItem("item_ward_sentry")
 end
 
+local BotLane = require("bot_lane")
+
 -- Known warding spots by lane: {x, y} offsets from lane front toward river/jungle.
 -- These are safe, commonly useful spots (rune entrances, jungle paths).
 local WARDSPOTS = {
-    safe  = { { x = 700,  y = 1200 }, { x = -400, y = 2800 } },
-    mid   = { { x = -1200, y = 1200 }, { x = 1200,  y = -1200 } },
-    off   = { { x = -2800, y = -400 }, { x = -1200, y = -700 } },
+    [BotLane.LANE_BOT] = { { x = 700,  y = 1200 }, { x = -400, y = 2800 } },
+    [BotLane.LANE_MID] = { { x = -1200, y = 1200 }, { x = 1200,  y = -1200 } },
+    [BotLane.LANE_TOP] = { { x = -2800, y = -400 }, { x = -1200, y = -700 } },
 }
 
 local function GetWardSpot(bot)
-    local lane = bot:GetAssignedLane() or "safe"
-    local spots = WARDSPOTS[lane] or WARDSPOTS.safe
+    local lane = BotLane.GetAssigned(bot)
+    local spots = WARDSPOTS[lane] or WARDSPOTS[BotLane.LANE_BOT]
     local pos = bot:GetAbsOrigin()
     -- Pick the spot closest to the bot so it doesn't walk halfway across map.
     local best, bestDist = nil, math.huge
@@ -46,7 +48,7 @@ function GetDesire()
     local desire = 0.5
 
     -- Carry/mid have better things to do than sitting on sentries.
-    local role = bot:GetRole()
+    local role = BotLane.GetRole(bot)
     if role == "carry" then desire = 0.2
     elseif role == "mid" then desire = 0.3 end
 

@@ -15,19 +15,11 @@ local SHOP_CONST = {
     secret = _G.SHOP_SECRET or 2,
 }
 
--- The next item this bot wants, and which shop sells it.
-function GetNextPurchase(bot)
-    local gold = bot:GetGold()
-    if gold <= 0 then return nil end
-
-    local build = ItemPurchase.BUILDS[ItemPurchase.NormalizeRole(bot:GetRole())]
-    for _, entry in ipairs(build) do
-        local item, minGold, shop = entry[1], entry[2], entry[3]
-        if gold >= minGold and not bot:HasItem(item) then
-            return item, shop
-        end
-    end
-    return nil
+-- The next item this bot wants and which shop sells it comes from
+-- ItemPurchase:GetNextPurchase(), so the purchase logic and the walk-to-shop
+-- logic can never disagree about what the bot is saving for.
+local function GetNextPurchase(bot)
+    return ItemPurchase:GetNextPurchase(bot)
 end
 
 function GetDesire()

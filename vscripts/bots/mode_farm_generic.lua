@@ -7,6 +7,8 @@
 -- The previous version defined only a module method and a global
 -- GetFarmAction(), neither of which the engine ever calls, so this mode could
 -- never activate.
+local BotLane = require("bot_lane")
+
 local function NeutralTier(name)
     if name:find("ancient") then return 4 end
     if name:find("large") then return 3 end
@@ -28,7 +30,7 @@ function GetDesire()
     if DotaTime() < 600 then desire = 0.15 end
 
     -- Carries want farm time more than supports do.
-    local role = bot:GetRole()
+    local role = BotLane.GetRole(bot)
     if role == "carry" then desire = desire + 0.1
     elseif role == "support" then desire = desire - 0.1 end
 
@@ -76,8 +78,7 @@ function Think()
     end
 
     -- Nothing to hit anywhere: hold the lane front.
-    local lane = bot:GetAssignedLane() or "safe"
-    local pos = GetLaneFrontLocation(GetTeam(), lane, 0)
+    local pos = BotLane.FrontLocation(bot, 0)
     if pos then
         bot:Action_AttackMove(pos)
     end

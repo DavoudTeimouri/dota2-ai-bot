@@ -19,6 +19,8 @@ local BOUNTY_SPOTS = {
     RUNE_BOUNTY_4,
 }
 
+local BotLane = require("bot_lane")
+
 local function AvailableRune(locList, statusCheck)
     if not GetRuneStatus then return nil end
     for _, loc in ipairs(locList) do
@@ -41,7 +43,7 @@ function GetDesire()
     local powerDesire = 0
     if powerPhase <= 60 then
         powerDesire = 0.45
-        if bot:GetRole() == "support" then powerDesire = 0.25 end
+        if BotLane.GetRole(bot) == "support" then powerDesire = 0.25 end
         if AvailableRune(RUNE_SPOTS, RUNE_STATUS_AVAILABLE) then
             powerDesire = powerDesire + 0.15
         end
@@ -84,8 +86,10 @@ function Think()
     end
 
     -- Unknown: contest mid, where power runes always spawn.
-    local pos = GetLaneFrontLocation(GetTeam(), "mid", 0)
-    if pos then
-        bot:Action_MoveToLocation(pos)
+    if GetLaneFrontLocation then
+        local pos = GetLaneFrontLocation(bot:GetTeam(), BotLane.LANE_MID, 0)
+        if pos then
+            bot:Action_MoveToLocation(pos)
+        end
     end
 end

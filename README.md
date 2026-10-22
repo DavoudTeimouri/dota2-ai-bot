@@ -6,32 +6,34 @@
 A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messages, hints to human players, and works as a team worker. No external dependencies — pure Lua Workshop addon. Synced to **Patch 7.41f**.
 
 ## Features
-- **Hero Selection**: Waits for human picks, then fills missing role and counters enemy lineup (falls back to POSITION_HEROES when GameRules unavailable).
-- **Lane Assignment**: Assigns lane based on hero role with dynamic priority; can swap lanes when safer.
-- **Per‑Hero Overrides**: Hero‑specific item builds, skill builds, and ability usage via `ability_item_usage_<hero>.lua` and `item_purchase_<hero>.lua` at the bot root.
-- **Adaptive Items**: Full role‑based build order (starter → core → luxury) with shop gating (home/side/secret) and minGold thresholds.
-- **Teamfight Positioning**: Simple retreat to nearest ally/tower when low HP and outnumbered.
-- **Communication Pings**: Automatic missing‑enemy alerts and assist requests based on game state.
-- **Vision Control**: Optimal ward placement considering rune times, gank paths, and depth (via `mode_ward_generic.lua`).
-- **Behavioral Variance**: Occasional randomness to avoid predictability.
-- **Mode‑Based Logic**: Eight modes that compete via GetDesire():
-  - `mode_laning_generic.lua` – hold lane, last hit, deny, do not feed
-  - `mode_farm_generic.lua` – jungle and lane farming when laning is weak
-  - `mode_ward_generic.lua` – place wards at per‑lane spots when safe
-  - `mode_rune_generic.lua` – contest power and bounty runes around spawn windows
-  - `mode_item_generic.lua` – walk to shop when next item is affordable
-  - `mode_push_lane_generic.lua` – push lane with wave and numbers advantage
-  - `mode_retreat_generic.lua` – disengage when low and outnumbered
-  - `mode_team_roam_generic.lua` – join allied fights, focus fire
-- **Deny Logic**: Attacks own low‑HP creeps when no clean last hit is available, denying enemy gold and XP.
-- **Rune Control**: Contests both power runes (2‑min cycle) and bounty runes (5‑min cycle) around spawn windows.
-- **Phased Strategies**: Early farm/deny → mid‑game gank & tower pressure → late‑game Roshan & team fights.
-- **Teamwork**: Shares vision hints, calls missing enemies, coordinates smoke ganks, buys courier upgrades, pulls/stacks jungle, heals/shields allies.
-- **Team Fight**: Prioritizes targets (squishy > disable > carry), uses ability combos, positions safely, initiates/disengages as needed.
-- **Supporting**: Buys wards, smoke, dust; pulls creep, stacks jungle; uses heal/shield items/abilities on allies.
-- **Communicating & Guiding**: Sends contextual, funny, weighted chat messages and chat‑wheel hints.
-- **Accept Human Orders**: Parses `!push <lane>`, `!roshan`, `!ward`, `!lane <lane>` in all‑chat and executes requested action.
-- **Chat Wheels & Sprays**: Custom wheel slots for frequent hints; spray triggers on first blood, tower kill, Roshan kill.
+What the bot actually does today. Every line is backed by code in `vscripts/bots/`.
+
+- **Hero Selection**: Position‑based hero pools with attribute filtering and counter‑pick weights (`hero_selection.lua`). Runs during pick/ban when the game exposes `GameRules`; otherwise Valve's own selection runs and the bot still gets its custom name.
+- **Custom Bot Names**: Human‑like names from a 250‑name pool across EN/ZH/KO/RU/ES, assigned in `hero_selection.lua` so they apply in every game phase.
+- **Lane Assignment**: Role‑based lane with the correct per‑team safe/offlane mapping. Lanes use the API's int constants (`LANE_TOP/MID/BOT`), normalised through `bot_lane.lua`.
+- **Eight Competing Modes**: The engine calls `GetDesire()` every frame in each `mode_*_generic.lua` and runs the highest one:
+  - `mode_laning_generic.lua` – hold lane, last hit, deny own dying creeps
+  - `mode_farm_generic.lua` – neutral creeps (tiered) and lane wave
+  - `mode_ward_generic.lua` – place wards at per‑lane spots, nearest first
+  - `mode_rune_generic.lua` – contest power (2‑min) and bounty (5‑min) runes
+  - `mode_item_generic.lua` – walk to the shop when the next item is affordable
+  - `mode_push_lane_generic.lua` – push with a big wave and a numbers advantage
+  - `mode_retreat_generic.lua` – disengage when hurt and outnumbered
+  - `mode_team_roam_generic.lua` – join allied fights, focus the lowest‑HP enemy
+- **Item Purchases**: Full per‑role build order (starter → core → luxury) with per‑item shop gating (home/side/secret) and gold thresholds. Repeated items (two tangos, three wards) are counted properly, so the bot buys every copy.
+- **Ability Usage**: Picks the best castable ability and the best target (closest + lowest HP) each frame.
+- **Item Active Usage**: Dust and smoke are cast on self (no target), Orchid of Malevolence on an enemy.
+- **Skill Levelling**: Unspent ability points are spent as they appear.
+- **Buyback**: Bought when dead and gold covers the cost.
+- **Courier**: Picks up stashed starting items once.
+- **Chat**: Contextual periodic messages (greeting, chit‑chat every 15s, a timed line every 60s) sent with `bot:ActionImmediate_Chat`. Team‑only; the bot VM cannot tell humans from bots.
+- **Per‑Hero Overrides**: Hero‑specific ability and skill logic via `ability_item_usage_<hero>.lua` at the bot root (see `ability_item_usage_antimage.lua`).
+
+### Not implemented
+These are not in the code, and the bot scripting VM cannot support them without a server plugin:
+- **Chat commands** (`!push`, `!roshan`, `!ward`, `!lane`). The bot VM has no `player_chat` event and no `GameRules:SendCustomMessage`, so a bot cannot read player chat. The only chat API is `ActionImmediate_Chat`, which sends.
+- **Human‑vs‑bot detection, net‑worth comparison, pause‑on‑kill, sprays, chat wheels.** All need `PlayerResource` or `GameRules`, both nil in this VM.
+- **Roshan coordination and tower‑defence execution.** `team_desires.lua` computes the desires, but acting on them needs map/entity queries the VM does not expose.
 
 ## Bot Name
 **AetherWeaver**
@@ -54,6 +56,7 @@ dota2-ai-bot/
         ├── ability_item_usage_generic.lua   # Generic ability/item/buyback/level-up hooks
         ├── ability_item_usage_antimage.lua  # Anti‑Mage per‑hero override (example)
         ├── bot_generic.lua                  # Minion AI entry point (MinionThink only)
+        ├── bot_lane.lua                     # Lane constants + role resolution helper
         ├── bot_names.lua                    # Human‑like name pool (EN/ZH/KO/RU/ES)
         ├── courier_generic.lua              # Courier usage hook (stash delivery)
         ├── hero_selection.lua               # Hero pick/ban phase (Think) + naming
@@ -99,12 +102,9 @@ You can test the bot in a local lobby using the **Local DevScript** option:
 5. Use `script_reload` to iterate on changes without restarting the lobby.
 
 ## Chat Commands
-| Command | Description |
-|---------|-------------|
-| `!push <lane>` | Push specified lane (top, mid, bot) |
-| `!roshan` | Request Roshan attempt |
-| `!ward` | Request ward placement |
-| `!lane <lane>` | Override bot's lane assignment |
+Not supported. The bot scripting VM has no `player_chat` event and no
+`GameRules:SendCustomMessage`, so a bot can only send chat
+(`bot:ActionImmediate_Chat`), never read it. See "Not implemented" above.
 
 ## Customizing the Bot
 Edit `vscripts/bots/init.lua` to change:
