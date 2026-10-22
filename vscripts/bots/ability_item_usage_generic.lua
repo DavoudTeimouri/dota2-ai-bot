@@ -134,14 +134,31 @@ end
 -- Use an active item (dust, smoke, orchid) when enemies are near.
 -- No-target items (dust, smoke) are cast on self; unit-target items (orchid)
 -- are cast on the nearest enemy.
-local NO_TARGET_ITEMS = { "item_dust", "item_smoke_of_deceit" }
+local NO_TARGET_ITEMS = { "item_dust" }
 local UNIT_TARGET_ITEMS = { "item_orchid_malevolence" }
+
+-- Smoke is worth spending only as a group: the point of it is that the
+-- whole team moves in unseen. A lone bot using it just walks into a gank
+-- alone.
+local function SmokeIsWorthIt(bot)
+    local allies = Compat.Allies(bot, 1200)
+    if #allies < 2 then return false end
+    -- Do not waste it in the first minutes.
+    if DotaTime and DotaTime() < 480 then return false end
+    return true
+end
 
 function AbilityUsage:GetItemUsage(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return nil end
 
     local enemies = Compat.Enemies(bot, 900)
     if #enemies == 0 then return nil end
+
+    -- Smoke: the group gank.
+    if Compat.HasItem(bot, "item_smoke_of_deceit") and SmokeIsWorthIt(bot) then
+        local smoke = Compat.ItemByName(bot, "item_smoke_of_deceit")
+        if smoke then return smoke, nil end
+    end
 
     -- No-target items: cast on self when enemies nearby.
     for _, name in ipairs(NO_TARGET_ITEMS) do
@@ -247,6 +264,17 @@ function AbilityLevelUpThink()
     local bot = GetBot()
     if not bot or bot:IsNull() then return end
     AbilityUsage:AbilityLevelUpThink(bot)
+end
+
+-- The engine reads CourierUsageThink() from THIS file, not from
+-- courier_generic.lua: it picks hooks by filename and gives each script its
+-- own Lua scope, so a hook defined in a file the engine does not read is
+-- dead code. courier_generic.lua holds the logic; this is the hook.
+function CourierUsageThink()
+    local bot = GetBot()
+    if not bot or bot:IsNull() then return end
+    local Courier = require("courier_generic")
+    Courier:CourierUsageThink(bot)
 end
 
 return AbilityUsage

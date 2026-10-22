@@ -22,11 +22,28 @@ local BOUNTY_SPOTS = {
 local BotLane = require("bot_lane")
 local Compat = require("bot_compat")
 
+-- Which bot has claimed which rune. The file is loaded once and the hooks
+-- run for every bot, so this table is shared across the team: without it
+-- every bot walks to the same rune.
+local claimed = {}
+
 local function AvailableRune(locList, statusCheck)
     if not GetRuneStatus then return nil end
     for _, loc in ipairs(locList) do
         if loc and GetRuneStatus(loc) == statusCheck then
             return loc
+        end
+    end
+    return nil
+end
+
+-- An available rune in the list that no other bot has claimed.
+local function FreeRune(locList, statusCheck, bot)
+    if not GetRuneStatus then return nil end
+    for _, loc in ipairs(locList) do
+        if loc and GetRuneStatus(loc) == statusCheck then
+            local owner = claimed[loc]
+            if not owner or owner == bot then return loc end
         end
     end
     return nil
@@ -68,21 +85,40 @@ function GetDesire()
     return desire
 end
 
+-- Drop claims on runes that are gone, so the next spawn at the same spot is
+-- free again.
+local function ReleaseStaleClaims()
+    if not GetRuneStatus then return end
+    for loc in pairs(claimed) do
+        if GetRuneStatus(loc) ~= RUNE_STATUS_AVAILABLE then
+            claimed[loc] = nil
+        end
+    end
+end
+
 function Think()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
 
-    -- Prefer a power rune we know is sitting there.
-    local loc = AvailableRune(RUNE_SPOTS, RUNE_STATUS_AVAILABLE)
-    if loc and GetRuneSpawnLocation then
-        Compat.MoveTo(bot, GetRuneSpawnLocation(loc))
-        return
+    ReleaseStaleClaims()
+
+    -- A power rune buffs the whole team, so only one bot needs to take it.
+    -- The mid claims it: it is closest to both power rune spots.
+    if BotLane.GetRole(bot) == "mid" then
+        local power = FreeRune(RUNE_SPOTS, RUNE_STATUS_AVAILABLE, bot)
+        if power and GetRuneSpawnLocation then
+            claimed[power] = bot
+            Compat.MoveTo(bot, GetRuneSpawnLocation(power))
+            return
+        end
     end
 
-    -- Otherwise a bounty rune.
-    loc = AvailableRune(BOUNTY_SPOTS, RUNE_STATUS_AVAILABLE)
-    if loc and GetRuneSpawnLocation then
-        Compat.MoveTo(bot, GetRuneSpawnLocation(loc))
+    -- A bounty rune is worth a different bot each time, so spread the team
+    -- over the available spots.
+    local bounty = FreeRune(BOUNTY_SPOTS, RUNE_STATUS_AVAILABLE, bot)
+    if bounty and GetRuneSpawnLocation then
+        claimed[bounty] = bot
+        Compat.MoveTo(bot, GetRuneSpawnLocation(bounty))
         return
     end
 

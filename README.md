@@ -26,10 +26,13 @@ What the bot actually does today. Every line is backed by code in `vscripts/bots
 - **Item Purchases**: Full per‑role build order (starter → core → luxury) with per‑item shop gating (home/side/secret) and gold thresholds. Repeated items (two tangos, three wards) are counted properly, so the bot buys every copy.
 - **Ability Usage**: Picks the best castable ability and the best target (closest + lowest HP) each frame.
 - **Per‑Hero Rules** (`hero_rules.lua`): every hero has an ultimate rule — `always`, `initiate`, `burst`, `defend`, `transform` or `dodge` — so a Lion ult is saved for a low target while a Zeus ult is used the moment it is in range. Heroes whose level order differs from the default (Anti‑Mage, Invoker, Zeus, Puck, Faceless Void, Lion, Ogre Magi, Crystal Maiden, Lich, Bane) level their abilities in the right order.
-- **Item Active Usage**: Dust and smoke are cast on self (no target), Orchid of Malevolence on an enemy. A neutral item picked up from a camp (slot 16) is used in a fight.
+- **Item Active Usage**: Dust is cast on self (no target), Orchid of Malevolence on an enemy. A neutral item picked up from a camp (slot 16) is used in a fight.
 - **Skill Levelling**: Unspent ability points are spent as they appear, in the hero's own order when it has one.
 - **Buyback**: Bought when dead and gold covers the cost.
-- **Courier**: Delivers the stashed starting items, then runs items to a teammate who is stuck in lane without wards.
+- **Runes**: power and bounty runes are claimed per bot, so the team spreads over the spots instead of five bots walking to the same rune. The mid takes the power rune, because the buff is team-wide and it is closest to both spots.
+- **Glyph of Fortification**: pressed by one bot while a tier‑1 tower is being hit, instead of five bots all pressing it.
+- **Smoke of Deceit**: used as a group gank, only when two or more allies are nearby. A lone bot using it just walks into a gank by itself.
+- **Courier**: delivers the stashed starting items, then runs items to a teammate who is stuck in lane without wards.
 - **API Compatibility Layer** (`bot_compat.lua`): The bot scripting API ships in more than one shape. Every uncertain call (hero queries, inventory, ability slots, attack, move, cast, level‑up, neutral items, towers, team members) goes through this module, which tries the documented form first and falls back to the older spelling. A missing method returns "nothing found" instead of raising, so no single API difference can freeze a bot.
 - **Human Detection**: `IsPlayerBot()` tells a human from a bot without `PlayerResource`, so the roam desire is higher when a human core is on the enemy team, and `GetNetWorth()` gives the net‑worth comparison the push and defend desires are built on.
 - **Chat**: Contextual periodic messages (greeting, chit‑chat every 15s, a timed line every 60s) sent with `bot:ActionImmediate_Chat`. Team‑only; the bot VM cannot tell humans from bots.
@@ -66,7 +69,7 @@ dota2-ai-bot/
         ├── bot_generic.lua                  # Minion AI entry point (MinionThink only)
         ├── bot_lane.lua                     # Lane constants + role resolution helper
         ├── bot_names.lua                    # Human‑like name pool (EN/ZH/KO/RU/ES)
-        ├── courier_generic.lua              # Courier usage hook (stash + teammate delivery)
+        ├── courier_generic.lua              # Courier logic (the hook is in the ability file)
         ├── hero_rules.lua                   # Per‑hero ultimate rule + level order
         ├── hero_selection.lua               # Hero pick/ban phase (SelectHero) + naming
         ├── init.lua                         # Message library + lane upkeep (BotThink)

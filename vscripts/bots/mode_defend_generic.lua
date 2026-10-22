@@ -17,6 +17,26 @@ local TOWER_CONST = {
     [BotLane.LANE_BOT] = _G.TOWER_BOT_1,
 }
 
+-- Use the Glyph of Fortification while a tower is being hit. It is a team
+-- action, so only one bot needs to press it.
+local glyphUsed = {}
+
+local function UseGlyphIfReady(bot, lane)
+    if not GetGlyphCooldown then return false end
+    if not bot.ActionImmediate_Glyph then return false end
+
+    local ok, cooldown = pcall(GetGlyphCooldown)
+    if not ok or not cooldown or cooldown > 0 then return false end
+
+    -- Already used this cycle by another bot: the glyph is on cooldown now,
+    -- so a second press is wasted.
+    if glyphUsed[lane] then return false end
+    glyphUsed[lane] = true
+
+    local used = pcall(bot.ActionImmediate_Glyph, bot)
+    return used
+end
+
 -- The enemy unit attacking the tier-1 tower of this lane, or nil.
 local function TowerAttacker(team, lane)
     if not GetTowerAttackTarget then return nil end
@@ -82,6 +102,9 @@ function Think()
 
     local lane = BotLane.GetAssigned(bot)
     local team = bot:GetTeam()
+
+    -- Fortify the tower while it is being hit.
+    UseGlyphIfReady(bot, lane)
 
     -- Hit the unit that is hitting our tower.
     local attacker = TowerAttacker(team, lane)

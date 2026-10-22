@@ -157,12 +157,8 @@ function Courier:CourierUsageThink(bot)
     DeliverToAlly(bot)
 end
 
--- Engine hook. Declared after the local table on purpose.
-function CourierUsageThink()
-    local bot = GetBot()
-    if bot and not bot:IsNull() then
-        Courier:CourierUsageThink(bot)
-    end
-end
-
+-- The CourierUsageThink() hook lives in ability_item_usage_generic.lua,
+-- because that is the file the engine reads it from. Defining it here as
+-- well would be a second global with the same name in a file the engine
+-- never loads.
 return Courier
