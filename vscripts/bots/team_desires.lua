@@ -81,10 +81,17 @@ local function GetVisibleEnemies()
     return enemies
 end
 
--- Count human players on enemy team
+-- Count human players on enemy team.
+-- The player-level API (IsPlayerBot) works in the bot VM, where PlayerResource
+-- does not exist, so the fallback is the normal path rather than the exception.
 local function CountHumanEnemies()
-    if not PlayerResource then return 0 end
     local count = 0
+    if not PlayerResource then
+        for _, enemy in ipairs(Compat.EnemyHeroes()) do
+            if not enemy.isBot then count = count + 1 end
+        end
+        return count
+    end
     local team = GetTeam()
     for i = 0, 9 do
         if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= team then
@@ -98,8 +105,15 @@ end
 
 -- Count human cores (carry/mid) on enemy team
 local function CountHumanCores()
-    if not PlayerResource then return 0 end
     local count = 0
+    if not PlayerResource then
+        for _, enemy in ipairs(Compat.EnemyHeroes()) do
+            if not enemy.isBot and enemy.level >= 10 then
+                count = count + 1
+            end
+        end
+        return count
+    end
     local team = GetTeam()
     for i = 0, 9 do
         if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) ~= team then
@@ -147,24 +161,41 @@ local function HasSmokeAvailable()
     return false
 end
 
--- Get net worth advantage
+-- Get net worth advantage.
+-- GetNetWorth() is a bot method, so the total is available without
+-- PlayerResource: our own net worth from the bot, the enemy total from the
+-- team members we can see.
 local function GetNetWorthAdvantage()
-    if not PlayerResource then return 0 end
-    local team = GetTeam()
+    local bot = GetBot()
     local myNW = 0
+    if bot and not bot:IsNull() and bot.GetNetWorth then
+        local ok, nw = pcall(bot.GetNetWorth, bot)
+        if ok and nw then myNW = nw end
+    end
+
     local enemyNW = 0
-    
-    for i = 0, 9 do
-        if PlayerResource:IsValidPlayer(i) then
-            local nw = PlayerResource:GetNetWorth(i)
-            if PlayerResource:GetTeam(i) == team then
-                myNW = myNW + nw
-            else
-                enemyNW = enemyNW + nw
+    if PlayerResource then
+        local team = GetTeam()
+        for i = 0, 9 do
+            if PlayerResource:IsValidPlayer(i) then
+                local nw = PlayerResource:GetNetWorth(i)
+                if PlayerResource:GetTeam(i) == team then
+                    myNW = myNW + nw
+                else
+                    enemyNW = enemyNW + nw
+                end
+            end
+        end
+    else
+        -- No PlayerResource: sum the net worth of the visible enemies.
+        for _, enemy in ipairs(Compat.Enemies(bot, 30000)) do
+            if enemy and not enemy:IsNull() and enemy.GetNetWorth then
+                local ok, nw = pcall(enemy.GetNetWorth, enemy)
+                if ok and nw then enemyNW = enemyNW + nw end
             end
         end
     end
-    
+
     return myNW - enemyNW
 end
 
@@ -533,6 +564,164 @@ function TeamDesires:Think()
     
     -- Update desires
     UpdateDesires()
+end
+
+-- ============================================================================
+-- ENGINE TEAM-DESIRE CONTRACT
+-- The engine does not read desireState. It calls these five globals itself
+-- and stores the answers, then the modes read them back through
+-- GetPushLaneDesire(lane), GetDefendLaneDesire(lane), GetFarmLaneDesire(lane),
+-- GetRoamDesire(), GetRoamTarget() and GetRoshanDesire().
+--
+-- Without them the engine has no team strategy at all: no push, no defence,
+-- no Roshan call, no roam.
+-- ============================================================================
+
+-- Enemy heroes per lane, from their last known position. A sighting older
+-- than 30 seconds is stale and does not count.
+local function LaneEnemyCounts()
+    local counts = { [1] = 0, [2] = 0, [3] = 0 }
+    for _, enemy in ipairs(Compat.EnemyHeroes()) do
+        if enemy.alive and enemy.pos and enemy.lastSeen < 30 then
+            local lane = Compat.LaneOfPosition(enemy.pos)
+            if lane and counts[lane] then counts[lane] = counts[lane] + 1 end
+        end
+    end
+    return counts
+end
+
+-- Allied heroes per lane, from where they stand right now.
+local function LaneAllyCounts()
+    local counts = { [1] = 0, [2] = 0, [3] = 0 }
+    for _, member in ipairs(Compat.TeamMembers()) do
+        local pos = Compat.Position(member)
+        local lane = Compat.LaneOfPosition(pos)
+        if lane and counts[lane] then counts[lane] = counts[lane] + 1 end
+    end
+    return counts
+end
+
+-- The shape the engine expects: one entry per lane. It is indexed both
+-- numerically (LANE_TOP=1, LANE_MID=2, LANE_BOT=3) and by name, because the
+-- reference only says "{top, mid, bot}".
+local function DesireTable(top, mid, bot)
+    return {
+        [1] = top, [2] = mid, [3] = bot,
+        top = top, mid = mid, bot = bot,
+    }
+end
+
+-- The team: Radiant is 2, Dire is 3.
+local function OurTeam()
+    local bot = GetBot()
+    if bot and not bot:IsNull() and bot.GetTeam then
+        local ok, team = pcall(bot.GetTeam, bot)
+        if ok and team then return team end
+    end
+    if GetTeam then
+        local ok, team = pcall(GetTeam)
+        if ok and team then return team end
+    end
+    return 2
+end
+
+-- Which lanes have their tier-1 tower under attack.
+local function LanesUnderAttack()
+    local set = {}
+    local team = OurTeam()
+    for _, lane in ipairs({ 1, 2, 3 }) do
+        if Compat.TowerUnderAttack(team, lane) then set[lane] = true end
+    end
+    return set
+end
+
+-- Engine hook. Returns the push desire for each lane.
+function UpdatePushLaneDesires()
+    UpdateDesires()
+    local base = CalculatePushDesire()
+    local enemies = LaneEnemyCounts()
+    local allies = LaneAllyCounts()
+
+    -- Push where we outnumber the enemy; hold back where they do.
+    local function adjust(lane, value)
+        local advantage = allies[lane] - enemies[lane]
+        if advantage >= 2 then return value + 0.2 end
+        if advantage <= 0 then return value * 0.4 end
+        return value
+    end
+    return DesireTable(adjust(1, base), adjust(2, base), adjust(3, base))
+end
+
+-- Engine hook. Returns the defend desire for each lane.
+function UpdateDefendLaneDesires()
+    UpdateDesires()
+    local base = CalculateDefendDesire()
+    local underAttack = LanesUnderAttack()
+    local enemies = LaneEnemyCounts()
+
+    local function adjust(lane, value)
+        if underAttack[lane] then
+            -- Our tower is being hit: go there now.
+            return math.min(1.0, value + 0.5)
+        end
+        if enemies[lane] > 0 then return math.min(1.0, value + 0.15) end
+        return value
+    end
+    return DesireTable(adjust(1, base), adjust(2, base), adjust(3, base))
+end
+
+-- Engine hook. Returns the farm desire for each lane. A lane with no enemies
+-- in it is the one worth farming.
+function UpdateFarmLaneDesires()
+    UpdateDesires()
+    local base = CalculateFarmDesire()
+    local enemies = LaneEnemyCounts()
+
+    -- Contested lanes are worth less: the wave dies before you can farm.
+    local function adjust(lane, value)
+        if enemies[lane] > 0 then return value * 0.5 end
+        return value
+    end
+    return DesireTable(adjust(1, base), adjust(2, base), adjust(3, base))
+end
+
+-- Engine hook. Returns the roam desire and the unit to roam to.
+function UpdateRoamDesire()
+    UpdateDesires()
+    local desire = desireState.values[DESIRE_TYPES.TEAMFIGHT] or 0
+
+    -- A human core is worth roaming for: ganking a human removes a real
+    -- player from the game, not another bot. It raises the desire; the
+    -- target stays a unit handle.
+    for _, enemy in ipairs(Compat.EnemyHeroes()) do
+        if enemy.alive and not enemy.isBot and enemy.level >= 10 then
+            desire = math.min(1.0, desire + 0.15)
+        end
+    end
+
+    -- The engine wants a unit handle. The weakest visible enemy hero is the
+    -- one worth finishing off.
+    local target = nil
+    local bot = GetBot()
+    if bot and not bot:IsNull() then
+        local weakestHp = math.huge
+        for _, enemy in ipairs(Compat.Enemies(bot, 2000)) do
+            if enemy and not enemy:IsNull() and enemy:IsAlive() then
+                local hp = enemy:GetHealth()
+                if hp < weakestHp then
+                    target, weakestHp = enemy, hp
+                end
+            end
+        end
+    end
+
+    return desire, target
+end
+
+-- Engine hook. Returns the Roshan desire.
+function UpdateRoshanDesire()
+    UpdateDesires()
+    return desireState.values[DESIRE_TYPES.ROSHAN] or 0
 end
 
 -- Engine hook. team_desires.lua is where the engine calls TeamThink() once per

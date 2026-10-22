@@ -5,6 +5,20 @@
 -- ordinary conditions or every bot leaves lane permanently.
 local Compat = require("bot_compat")
 
+-- The team's roam desire and the unit it picked. team_desires.lua's
+-- UpdateRoamDesire() returns both, and the engine stores them.
+local function TeamRoam()
+    if not GetRoamDesire then return nil, nil end
+    local ok, desire = pcall(GetRoamDesire)
+    if not ok or not desire then return nil, nil end
+    local target = nil
+    if GetRoamTarget then
+        local ok2, t = pcall(GetRoamTarget)
+        if ok2 then target = t end
+    end
+    return desire, target
+end
+
 function GetDesire()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return 0 end
@@ -25,12 +39,25 @@ function GetDesire()
     -- Late game fights are worth more than an early skirmish.
     if DotaTime() > 1200 then desire = desire + 0.1 end
 
+    -- The team decides whether roaming is worth it right now.
+    local teamDesire = TeamRoam()
+    if teamDesire then
+        desire = desire * (0.5 + teamDesire)
+    end
+
     return desire
 end
 
 function Think()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return end
+
+    -- The team named a target: take it.
+    local _, teamTarget = TeamRoam()
+    if teamTarget and not teamTarget:IsNull() and teamTarget:IsAlive() then
+        Compat.Attack(bot, teamTarget)
+        return
+    end
 
     local enemies = Compat.Enemies(bot, 2000)
     if #enemies == 0 then return end

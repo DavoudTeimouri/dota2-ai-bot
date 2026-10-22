@@ -174,11 +174,12 @@ _G.LANE_BOT = 3
 -- ---- Load the modules the way the engine does -------------------------------
 local mods = {}
 for _, name in ipairs({
-    "bot_compat", "bot_lane", "bot_names", "hero_selection", "team_desires",
-    "ability_item_usage_generic", "item_purchase_generic", "skill_build_generic",
-    "courier_generic", "mode_laning_generic", "mode_farm_generic",
-    "mode_item_generic", "mode_ward_generic", "mode_rune_generic",
-    "mode_push_lane_generic", "mode_retreat_generic", "mode_team_roam_generic",
+    "bot_compat", "bot_lane", "bot_names", "hero_rules", "hero_selection",
+    "team_desires", "ability_item_usage_generic", "item_purchase_generic",
+    "skill_build_generic", "courier_generic", "mode_laning_generic",
+    "mode_farm_generic", "mode_item_generic", "mode_ward_generic",
+    "mode_rune_generic", "mode_push_lane_generic", "mode_retreat_generic",
+    "mode_team_roam_generic", "mode_defend_generic",
 }) do
     local ok, mod = pcall(require, name)
     check("lobby: " .. name .. " loads", ok and type(mod) == "table",
@@ -201,7 +202,7 @@ for _, file in ipairs({
     "mode_farm_generic.lua", "mode_item_generic.lua", "mode_ward_generic.lua",
     "mode_rune_generic.lua", "mode_push_lane_generic.lua",
     "mode_retreat_generic.lua", "mode_team_roam_generic.lua",
-    "team_desires.lua", "hero_selection.lua",
+    "mode_defend_generic.lua", "team_desires.lua", "hero_selection.lua",
 }) do
     check("lobby: " .. file .. " loads without error", LoadHook(file))
 end

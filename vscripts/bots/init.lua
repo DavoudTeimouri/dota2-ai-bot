@@ -549,6 +549,47 @@ end
 --
 -- Lanes are int constants in the bot API (LANE_TOP/MID/BOT), and the safe and
 -- offlane depend on which team the bot is on.
+
+-- After the laning phase a bot follows the team's plan instead of its
+-- starting lane: the support rotates to whichever lane is under pressure,
+-- and the offlane helps the safe lane when the team wants to push it.
+-- Returns nil when the bot should keep the lane it has.
+local function LateGameLane(bot, role)
+    if not DotaTime then return nil end
+    local now = DotaTime()
+    if now < 0 then return nil end
+
+    local lanes = { BotLane.LANE_TOP, BotLane.LANE_MID, BotLane.LANE_BOT }
+
+    local function bestLane(getter, threshold)
+        if not getter then return nil end
+        local best, bestDesire = nil, 0
+        for _, lane in ipairs(lanes) do
+            local ok, desire = pcall(getter, lane)
+            if ok and desire and desire > bestDesire then
+                best, bestDesire = lane, desire
+            end
+        end
+        if best and bestDesire > threshold then return best end
+        return nil
+    end
+
+    if role == "support" then
+        -- Rotate after 8 minutes, and only when a lane really is in trouble.
+        if now < 480 then return nil end
+        return bestLane(GetDefendLaneDesire, 0.5)
+    end
+
+    if role == "offlane" then
+        -- Help the safe lane after 12 minutes when the team wants it pushed.
+        if now < 720 then return nil end
+        local want = bestLane(GetPushLaneDesire, 0.6)
+        if want and want ~= BotLane.GetAssigned(bot) then return want end
+    end
+
+    return nil
+end
+
 function AetherWeaver:MaintainLane(bot)
     local role = BotLane.GetRole(bot)
     local team = bot:GetTeam()
@@ -560,6 +601,12 @@ function AetherWeaver:MaintainLane(bot)
     end
     if want and BotLane.GetAssigned(bot) ~= want then
         BotLane.Set(bot, want)
+    end
+
+    -- The team's plan can move a bot off its starting lane.
+    local late = LateGameLane(bot, role)
+    if late and BotLane.GetAssigned(bot) ~= late then
+        BotLane.Set(bot, late)
     end
 end
 

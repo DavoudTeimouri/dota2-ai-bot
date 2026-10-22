@@ -12,6 +12,7 @@
 local AbilityUsage = {}
 
 local Compat = require("bot_compat")
+local HeroRules = require("hero_rules")
 
 -- Max ability slots per hero.
 local MAX_SLOTS = 6
@@ -34,10 +35,56 @@ local function IsUltimate(ability)
     return false
 end
 
--- The ultimate is worth spending on a bigger target than a normal spell:
--- two or more enemies nearby, or a target already low on health.
-local function UltimateIsWorthIt(ability, target, enemyCount)
+-- The hero's own name, for the per-hero rules.
+local function HeroName(bot)
+    if bot.GetUnitName then
+        local ok, name = pcall(bot.GetUnitName, bot)
+        if ok and name then return HeroRules.ShortName(name) end
+    end
+    if GetSelectedHeroName and bot.GetPlayerID then
+        local ok, id = pcall(bot.GetPlayerID, bot)
+        if ok then
+            local ok2, name = pcall(GetSelectedHeroName, id)
+            if ok2 and name then return HeroRules.ShortName(name) end
+        end
+    end
+    return nil
+end
+
+-- Is an ally in danger? Used by the defensive ultimates.
+local function AllyInDanger(bot)
+    for _, ally in ipairs(Compat.Allies(bot, 1200)) do
+        if ally and not ally:IsNull() and ally:IsAlive() then
+            local hp = ally:GetHealth() / math.max(1, ally:GetMaxHealth())
+            if hp < 0.25 then return true end
+        end
+    end
+    return false
+end
+
+-- Should the ultimate be spent now? The rule comes from hero_rules.lua.
+-- A hero that is not listed falls back to the default: two or more enemies
+-- nearby, or a target that is already low.
+local function UltimateIsWorthIt(bot, ability, target, enemyCount)
     if not IsUltimate(ability) then return false end
+
+    local rules = HeroRules.For(HeroName(bot))
+    local rule = rules and rules.ult
+
+    if rule == "always" then return true end
+    if rule == "initiate" then return enemyCount >= 2 end
+    if rule == "burst" then
+        local hp = target:GetHealth() / math.max(1, target:GetMaxHealth())
+        return hp < 0.4
+    end
+    if rule == "defend" then return AllyInDanger(bot) end
+    if rule == "transform" then return enemyCount >= 1 end
+    if rule == "dodge" then
+        local hpPct = bot:GetHealth() / math.max(1, bot:GetMaxHealth())
+        return hpPct < 0.3
+    end
+
+    -- Default.
     if enemyCount >= 2 then return true end
     local hp = target:GetHealth() / math.max(1, target:GetMaxHealth())
     return hp < 0.4
@@ -71,7 +118,7 @@ function AbilityUsage:GetAbilityUsage(bot)
             if target then
                 -- An ultimate that is worth it beats every normal spell.
                 local score = top
-                if UltimateIsWorthIt(ability, target, #ranked) then
+                if UltimateIsWorthIt(bot, ability, target, #ranked) then
                     score = score + 10000
                 end
                 if score > bestScore then
@@ -145,10 +192,22 @@ function AbilityUsage:ShouldBuyback(bot)
     return cost > 0 and bot:GetGold() >= cost
 end
 
--- Spend an unspent ability point on the first upgradable ability.
+-- Spend an unspent ability point. The hero's own level order wins when
+-- hero_rules.lua has one for it; otherwise the slot order is used.
 function AbilityUsage:AbilityLevelUpThink(bot)
     if not bot or bot:IsNull() then return false end
     if bot:GetAbilityPoints() <= 0 then return false end
+
+    local rules = HeroRules.For(HeroName(bot))
+    if rules and rules.level and bot.GetAbilityByName then
+        for _, name in ipairs(rules.level) do
+            local ability = bot:GetAbilityByName(name)
+            if ability and not ability:IsNull() and ability:CanAbilityBeUpgraded() then
+                return Compat.LevelAbility(bot, ability)
+            end
+        end
+    end
+
     for i = 0, MAX_SLOTS - 1 do
         local ability = Compat.AbilityInSlot(bot, i)
         if ability and not ability:IsNull() and ability:CanAbilityBeUpgraded() then

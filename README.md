@@ -8,34 +8,39 @@ A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messag
 ## Features
 What the bot actually does today. Every line is backed by code in `vscripts/bots/`.
 
-- **Hero Selection**: Position‑based hero pools with attribute filtering and counter‑pick weights (`hero_selection.lua`). It calls `SelectHero()` so the pick is locked in, not just announced in chat. When `GameRules` is missing (the normal case in the bot VM) it falls back to `IsPlayerInHeroSelectionControl()` + `SelectHero()`. Two bots on the same team never pick the same hero.
+- **Hero Selection**: Position‑based hero pools with attribute filtering and counter‑pick weights (`hero_selection.lua`). It calls `SelectHero()` so the pick is locked in, not just announced in chat. `IsPlayerInHeroSelectionControl()` says whose turn it is, and the Captains Mode queries (`IsCMBannedHero`, `IsCMPickedHero`) say which heroes are still out. Two bots on the same team never pick the same hero.
 - **Custom Bot Names**: Human‑like names from a 250‑name pool across EN/ZH/KO/RU/ES, assigned in `hero_selection.lua` so they apply in every game phase.
 - **Lane Assignment**: Role‑based lane with the correct per‑team safe/offlane mapping. Lanes use the API's int constants (`LANE_TOP/MID/BOT`), normalised through `bot_lane.lua`.
-- **Eight Competing Modes**: The engine calls `GetDesire()` every frame in each `mode_*_generic.lua` and runs the highest one:
+- **Nine Competing Modes**: The engine calls `GetDesire()` every frame in each `mode_*_generic.lua` and runs the highest one:
   - `mode_laning_generic.lua` – hold lane, last hit, deny own dying creeps
   - `mode_farm_generic.lua` – neutral creeps (tiered) and lane wave
   - `mode_ward_generic.lua` – place wards at per‑lane spots, nearest first
   - `mode_rune_generic.lua` – contest power (2‑min) and bounty (5‑min) runes
   - `mode_item_generic.lua` – walk to the shop when the next item is affordable
   - `mode_push_lane_generic.lua` – push with a big wave and a numbers advantage
+  - `mode_defend_generic.lua` – defend the tier‑1 tower that is under attack
   - `mode_retreat_generic.lua` – disengage when hurt and outnumbered
   - `mode_team_roam_generic.lua` – join allied fights, focus the lowest‑HP enemy
+- **Team Strategy**: `team_desires.lua` implements the engine's team‑desire contract — `UpdatePushLaneDesires()`, `UpdateDefendLaneDesires()`, `UpdateFarmLaneDesires()`, `UpdateRoamDesire()` and `UpdateRoshanDesire()`. The engine stores those answers and the modes read them back through `GetPushLaneDesire(lane)`, `GetDefendLaneDesire(lane)`, `GetRoamDesire()` and `GetRoshanTarget()`. The push desire is higher in the lane the team outnumbers the enemy in, the defend desire spikes when a tier‑1 tower is being hit, and the farm desire drops in a contested lane.
+- **Lane Rotation**: after 8 minutes a support rotates to whichever lane the team wants to defend; after 12 minutes an offlane helps the safe lane when the team wants to push it. The carry never leaves the safe lane.
 - **Item Purchases**: Full per‑role build order (starter → core → luxury) with per‑item shop gating (home/side/secret) and gold thresholds. Repeated items (two tangos, three wards) are counted properly, so the bot buys every copy.
-- **Ability Usage**: Picks the best castable ability and the best target (closest + lowest HP) each frame. The ultimate is preferred over a normal spell when two or more enemies are in range or the target is already low.
+- **Ability Usage**: Picks the best castable ability and the best target (closest + lowest HP) each frame.
+- **Per‑Hero Rules** (`hero_rules.lua`): every hero has an ultimate rule — `always`, `initiate`, `burst`, `defend`, `transform` or `dodge` — so a Lion ult is saved for a low target while a Zeus ult is used the moment it is in range. Heroes whose level order differs from the default (Anti‑Mage, Invoker, Zeus, Puck, Faceless Void, Lion, Ogre Magi, Crystal Maiden, Lich, Bane) level their abilities in the right order.
 - **Item Active Usage**: Dust and smoke are cast on self (no target), Orchid of Malevolence on an enemy. A neutral item picked up from a camp (slot 16) is used in a fight.
-- **Skill Levelling**: Unspent ability points are spent as they appear.
+- **Skill Levelling**: Unspent ability points are spent as they appear, in the hero's own order when it has one.
 - **Buyback**: Bought when dead and gold covers the cost.
 - **Courier**: Delivers the stashed starting items, then runs items to a teammate who is stuck in lane without wards.
-- **API Compatibility Layer** (`bot_compat.lua`): The bot scripting API ships in more than one shape. Every uncertain call (hero queries, inventory, ability slots, attack, move, cast, level‑up) goes through this module, which tries the documented form first and falls back to the older spelling. A missing method returns "nothing found" instead of raising, so no single API difference can freeze a bot.
+- **API Compatibility Layer** (`bot_compat.lua`): The bot scripting API ships in more than one shape. Every uncertain call (hero queries, inventory, ability slots, attack, move, cast, level‑up, neutral items, towers, team members) goes through this module, which tries the documented form first and falls back to the older spelling. A missing method returns "nothing found" instead of raising, so no single API difference can freeze a bot.
+- **Human Detection**: `IsPlayerBot()` tells a human from a bot without `PlayerResource`, so the roam desire is higher when a human core is on the enemy team, and `GetNetWorth()` gives the net‑worth comparison the push and defend desires are built on.
 - **Chat**: Contextual periodic messages (greeting, chit‑chat every 15s, a timed line every 60s) sent with `bot:ActionImmediate_Chat`. Team‑only; the bot VM cannot tell humans from bots.
 - **Per‑Hero Overrides**: Hero‑specific ability and skill logic via `ability_item_usage_<hero>.lua` at the bot root (see `ability_item_usage_antimage.lua`).
 
 ### Not implemented
 These are not in the code, and the bot scripting VM cannot support them without a server plugin:
 - **Chat commands** (`!push`, `!roshan`, `!ward`, `!lane`). The bot VM has no `player_chat` event and no `GameRules:SendCustomMessage`, so a bot cannot read player chat. The only chat API is `ActionImmediate_Chat`, which sends.
-- **Human‑vs‑bot detection and net‑worth comparison.** They need `PlayerResource` or `GameRules`, both nil in this VM. The team desires fall back to the nearby‑hero queries instead.
-- **Tower‑defence execution.** `team_desires.lua` computes the desire, but acting on it needs map/entity queries the VM does not expose.
-- **Per‑hero overrides for every hero.** Only Anti‑Mage has one; the generic handler covers the rest.
+- **Pause‑on‑kill, sprays, chat wheels.** They need `GameRules` or a server plugin, both of which a bot script does not get.
+- **Roshan execution.** The team sets the Roshan desire, but the API exposes no Roshan position, so the bot cannot walk to the pit. The engine's own Roshan mode uses that desire.
+- **Per‑hero overrides as separate files.** Every hero is covered by `hero_rules.lua` rather than 100+ near‑identical modules. A hero that needs genuinely bespoke logic still gets an `ability_item_usage_<hero>.lua` at the bot root.
 
 ## Bot Name
 **AetherWeaver**
@@ -62,12 +67,14 @@ dota2-ai-bot/
         ├── bot_lane.lua                     # Lane constants + role resolution helper
         ├── bot_names.lua                    # Human‑like name pool (EN/ZH/KO/RU/ES)
         ├── courier_generic.lua              # Courier usage hook (stash + teammate delivery)
+        ├── hero_rules.lua                   # Per‑hero ultimate rule + level order
         ├── hero_selection.lua               # Hero pick/ban phase (SelectHero) + naming
         ├── init.lua                         # Message library + lane upkeep (BotThink)
         ├── item_purchase_generic.lua        # Generic item purchase hook with build orders
         ├── rune_generic.lua                 # Rune reset stub (required by engine)
         ├── skill_build_generic.lua          # Skill build hook (forwards to ability_item_usage)
-        ├── team_desires.lua                 # Team‑level desire calculator + TeamThink executor
+        ├── team_desires.lua                 # Team desire calculator + the engine's five hooks
+        ├── mode_defend_generic.lua          # Defend mode (tier‑1 tower under attack)
         ├── mode_farm_generic.lua            # Farm mode (neutral creeps + lane wave)
         ├── mode_item_generic.lua            # Item/shop mode (walk to shop when affordable)
         ├── mode_laning_generic.lua          # Laning mode (last hit + deny)
@@ -87,6 +94,7 @@ lua5.1 tests/test_runtime.lua       # the two crashes that froze every bot
 lua5.1 tests/test_engine_hooks.lua  # every engine hook is a global function
 lua5.1 tests/test_probe.lua         # executes the real bot code against a fake engine
 lua5.1 tests/test_lobby.lua         # one full game frame: bot must move and must buy
+lua5.1 tests/test_team.lua          # team desire contract, defend mode, per‑hero rules
 ```
 
 `test_lobby.lua` is the one that matters: it drives the whole hook sequence

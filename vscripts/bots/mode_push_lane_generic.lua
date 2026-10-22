@@ -10,6 +10,17 @@ local function CountAllies(bot)
     return #Compat.Allies(bot, 1800)
 end
 
+-- The team's push desire for the lane this bot is in. The engine stores what
+-- team_desires.lua's UpdatePushLaneDesires() returned, so this is the team's
+-- plan, not a number this bot invented.
+local function TeamPushDesire(bot)
+    if not GetPushLaneDesire then return nil end
+    local lane = BotLane.GetAssigned(bot)
+    local ok, desire = pcall(GetPushLaneDesire, lane)
+    if ok and desire then return desire end
+    return nil
+end
+
 function GetDesire()
     local bot = GetBot()
     if not bot or bot:IsNull() or not bot:IsAlive() then return 0 end
@@ -31,6 +42,13 @@ function GetDesire()
     local desire = 0.5
     if allies >= enemies + 2 then desire = desire + 0.15 end
     if DotaTime() > 1200 then desire = desire + 0.1 end
+
+    -- The team decides which lane to push. A lane the team does not want
+    -- pushed stays at its own desire.
+    local teamDesire = TeamPushDesire(bot)
+    if teamDesire then
+        desire = desire * (0.5 + teamDesire)
+    end
 
     return desire
 end

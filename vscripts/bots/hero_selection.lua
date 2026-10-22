@@ -201,11 +201,13 @@ local function GetCounterPicks(enemyPicks, bannedHeroes)
 end
 
 -- Get best pick recommendation
-function HeroSelection:GetBestPick(humanRoles, enemyPicks, bannedHeroes)
+-- poolOverride: the caller may pass the heroes that are actually still
+-- available, already filtered against the bans and the enemy picks.
+function HeroSelection:GetBestPick(humanRoles, enemyPicks, bannedHeroes, poolOverride)
     -- Determine our position
     local bot = GetBot()
     local position = GetBotPosition(bot)
-    local pool = POSITION_HEROES[position] or POSITION_HEROES[1]
+    local pool = poolOverride or (POSITION_HEROES[position] or POSITION_HEROES[1])
     local preferredAttr = GetPreferredAttr(position)
     
     -- Filter by attribute
@@ -328,41 +330,79 @@ end
 local DOTA_TEAM_GOODGUYS = 2
 local DOTA_TEAM_BADGUYS = 3
 
--- The bot script VM has no GameRules and no PlayerResource, so the full
--- Captains Mode flow cannot run there. The API still exposes
--- IsPlayerInHeroSelectionControl() and SelectHero(), which is enough to pick
--- a hero when it is this player's turn.
-local function FallbackPick(bot)
-    if not SelectHero then return end
-    if not IsPlayerInHeroSelectionControl then return end
-
-    local playerID = bot:GetPlayerID()
-    if playerID < 0 or playerID > 9 then return end
-
+-- Is it this player's turn to act in the pick phase?
+-- This is the only gate that matters: it is false outside the pick phase
+-- and false when it is somebody else's turn.
+local function OurTurnToPick(playerID)
+    if not IsPlayerInHeroSelectionControl then return false end
     local ok, inControl = pcall(IsPlayerInHeroSelectionControl, playerID)
-    if not ok or not inControl then return end
+    if not ok then return false end
+    return inControl and true or false
+end
 
-    local team = bot:GetTeam()
-    local teamKey = (team == DOTA_TEAM_GOODGUYS) and "radiant" or "dire"
+-- The enemy team constant, for the Captains Mode queries.
+local function EnemyTeam(team)
+    if GetOpposingTeam then
+        local ok, enemy = pcall(GetOpposingTeam)
+        if ok and enemy then return enemy end
+    end
+    return (team == DOTA_TEAM_GOODGUYS) and DOTA_TEAM_BADGUYS or DOTA_TEAM_GOODGUYS
+end
 
-    -- Enemy picks and bans are not visible without PlayerResource, so pick
-    -- from the position pool and skip heroes this team already took.
-    local choice = HeroSelection:GetBestPick({}, {}, {})
-    if not choice then return end
-    if picked[teamKey] and picked[teamKey][choice] then
-        -- Taken by a teammate: fall back to the first hero in the pool.
-        local pool = POSITION_HEROES[GetBotPosition(bot)] or POSITION_HEROES[1]
-        for _, entry in ipairs(pool) do
-            if not (picked[teamKey] and picked[teamKey][entry.hero]) then
-                choice = entry.hero
-                break
+-- Has the enemy team already picked this hero?
+local function EnemyPicked(enemyTeam, hero)
+    if not IsCMPickedHero then return false end
+    local ok, picked = pcall(IsCMPickedHero, enemyTeam, hero)
+    if not ok then return false end
+    return picked and true or false
+end
+
+-- Has this hero been banned?
+local function IsBanned(hero)
+    if not IsCMBannedHero then return false end
+    local ok, banned = pcall(IsCMBannedHero, hero)
+    if not ok then return false end
+    return banned and true or false
+end
+
+-- The heroes a human on our team has already taken, so the bot does not
+-- duplicate a role. Reads the selected hero name per player slot.
+local function HumanRoles(team)
+    local roles = {}
+    if not GetTeamPlayers or not GetSelectedHeroName or not IsPlayerBot then
+        return roles
+    end
+    local ok, players = pcall(GetTeamPlayers, team)
+    if not ok or not players then return roles end
+    for _, pid in ipairs(players) do
+        local ok2, isBot = pcall(IsPlayerBot, pid)
+        if ok2 and not isBot then
+            local ok3, name = pcall(GetSelectedHeroName, pid)
+            if ok3 and name then
+                if name:find("antimage") or name:find("juggernaut")
+                    or name:find("phantom_assassin") or name:find("spectre")
+                    or name:find("medusa") or name:find("luna")
+                    or name:find("drow_ranger") or name:find("terrorblade")
+                    or name:find("morphling") or name:find("faceless_void") then
+                    roles.carry = true
+                elseif name:find("invoker") or name:find("storm_spirit")
+                    or name:find("templar_assassin") or name:find("puck")
+                    or name:find("ember_spirit") or name:find("queenofpain")
+                    or name:find("shadow_fiend") or name:find("tinker")
+                    or name:find("zeus") then
+                    roles.mid = true
+                elseif name:find("centaur") or name:find("tidehunter")
+                    or name:find("dragon_knight") or name:find("axe")
+                    or name:find("mars") or name:find("underlord")
+                    or name:find("bristleback") or name:find("timbersaw") then
+                    roles.offlane = true
+                else
+                    roles.support = true
+                end
             end
         end
     end
-
-    if CommitPick(playerID, choice, teamKey) then
-        Say("-pick " .. ShortHeroName(choice))
-    end
+    return roles
 end
 
 function HeroSelection:Think()
@@ -371,92 +411,61 @@ function HeroSelection:Think()
         phaseState.initialized = true
         print("[HeroSelection] Initialized")
     end
-    
+
     local bot = GetBot()
     if not bot or bot:IsNull() then return end
 
     -- Naming works in every game phase, so do it before the pick/ban checks.
     EnsureBotName(bot)
 
-    -- GameRules and PlayerResource are nil in the bot script VM. Guard both.
-    if not GameRules or GameRules.State_Get == nil or not PlayerResource then
-        FallbackPick(bot)
-        return
-    end
-    
-    local gameState = GameRules:State_Get()
-    if gameState ~= DOTA_GAMERULES_STATE_HERO_SELECTION then
-        return
-    end
-    
     local playerID = bot:GetPlayerID()
     if playerID < 0 or playerID > 9 then return end
-    
-    -- Get current pick/ban state
-    local pickState = GetHeroPickState()
-    if not pickState then return end
-    
+
+    -- Outside the pick phase there is nothing to do.
+    if not OurTurnToPick(playerID) then return end
+
     local team = bot:GetTeam()
-    local isRadiant = team == DOTA_TEAM_GOODGUYS
-    local teamKey = isRadiant and "radiant" or "dire"
-    
-    -- Get current phase
-    local phase = pickState.phase or "ban"
-    local currentPicker = pickState.currentPicker
-    
-    -- Check if it's our turn
-    if currentPicker ~= playerID then
-        return
-    end
-    
-    -- Collect enemy picks and banned heroes
-    local enemyPicks = {}
-    local bannedHeroes = {}
-    
-    for _, pick in ipairs(pickState.picks or {}) do
-        if pick.team ~= teamKey then
-            table.insert(enemyPicks, pick.hero)
-        end
-    end
-    
-    for _, ban in ipairs(pickState.bans or {}) do
-        table.insert(bannedHeroes, ban.hero)
-    end
-    
-    -- Get human roles on our team
-    local humanRoles = {}
-    for i = 0, 9 do
-        if PlayerResource:IsValidPlayer(i) and PlayerResource:GetTeam(i) == team and not PlayerResource:IsFakeClient(i) then
-            local hero = PlayerResource:GetSelectedHeroEntity(i)
-            if hero and not hero:IsNull() then
-                local name = hero:GetUnitName()
-                if name:find("antimage") or name:find("juggernaut") or name:find("phantom_assassin") or name:find("spectre") or name:find("medusa") then
-                    humanRoles.carry = true
-                elseif name:find("invoker") or name:find("storm") or name:find("templar") or name:find("puck") or name:find("ember") then
-                    humanRoles.mid = true
-                elseif name:find("centaur") or name:find("tidehunter") or name:find("dragon_knight") or name:find("axe") or name:find("mars") then
-                    humanRoles.offlane = true
-                else
-                    humanRoles.support = true
-                end
-            end
-        end
-    end
-    
-    if phase == "ban" then
-        local bans = self:GetBanRecommendations(enemyPicks, bannedHeroes)
+    local teamKey = (team == DOTA_TEAM_GOODGUYS) and "radiant" or "dire"
+    local enemyTeam = EnemyTeam(team)
+
+    -- Captains Mode has a ban phase before the picks.
+    if IsInCMBanPhase and IsInCMBanPhase() then
+        local bans = self:GetBanRecommendations({}, {})
         if #bans > 0 then
             Say("-ban " .. bans[1].hero)
             print("[HeroSelection] Banned: " .. bans[1].hero)
         end
-    elseif phase == "pick" then
-        local pick = self:GetBestPick(humanRoles, enemyPicks, bannedHeroes)
-        if pick then
-            -- Lock the pick in, not just announce it.
-            CommitPick(playerID, pick, teamKey)
-            Say("-pick " .. ShortHeroName(pick))
-            print("[HeroSelection] Picked: " .. pick)
+        return
+    end
+
+    -- Pick a hero. The Captains Mode queries tell us which heroes are out.
+    local pool = POSITION_HEROES[GetBotPosition(bot)] or POSITION_HEROES[1]
+    local available = {}
+    for _, entry in ipairs(pool) do
+        if not IsBanned(entry.hero) and not EnemyPicked(enemyTeam, entry.hero) then
+            available[#available + 1] = entry
         end
+    end
+    -- Every hero in the position is taken: widen the search to the whole pool.
+    if #available == 0 then
+        for _, entries in pairs(POSITION_HEROES) do
+            for _, entry in ipairs(entries) do
+                if not IsBanned(entry.hero) and not EnemyPicked(enemyTeam, entry.hero) then
+                    available[#available + 1] = entry
+                end
+            end
+        end
+    end
+    if #available == 0 then return end
+
+    local humanRoles = HumanRoles(team)
+    local pick = self:GetBestPick(humanRoles, {}, {}, available)
+    if not pick then return end
+
+    -- Lock the pick in, not just announce it.
+    if CommitPick(playerID, pick, teamKey) then
+        Say("-pick " .. ShortHeroName(pick))
+        print("[HeroSelection] Picked: " .. pick)
     end
 end
 

@@ -318,4 +318,119 @@ function Compat.LaneAmount(bot)
     return 0.5
 end
 
+-- LANE_TOP = 1, LANE_MID = 2, LANE_BOT = 3. The lane constants are absolute:
+-- they name a side of the map, not a side for a given team.
+local LANE_TOP, LANE_MID, LANE_BOT = 1, 2, 3
+
+-- Which lane a world position belongs to. The map diagonal runs from the
+-- Radiant corner to the Dire corner: below it is the bottom lane, above it
+-- the top lane, and near it the mid lane.
+function Compat.LaneOfPosition(pos)
+    if not pos then return nil end
+    local x, y = pos.x or 0, pos.y or 0
+    local diff = x - y
+    if math.abs(diff) < 2000 then return LANE_MID end
+    if diff > 0 then return LANE_BOT end
+    return LANE_TOP
+end
+
+-- The tier-1 tower constant for a lane.
+local TOWER_CONST = {
+    [LANE_TOP] = _G.TOWER_TOP_1,
+    [LANE_MID] = _G.TOWER_MID_1,
+    [LANE_BOT] = _G.TOWER_BOT_1,
+}
+
+-- Is the tier-1 tower of this lane being attacked by a hero?
+function Compat.TowerUnderAttack(team, lane)
+    if not GetTower or not GetTowerAttackTarget then return false end
+    local const = TOWER_CONST[lane]
+    if not const then return false end
+
+    local ok, target = pcall(GetTowerAttackTarget, team, const)
+    if not ok or not target then return false end
+
+    -- A tower attacking a creep is not under pressure.
+    if target.GetUnitName then
+        local ok2, name = pcall(target.GetUnitName, target)
+        if ok2 and name and not name:find("npc_dota_hero") then return false end
+    end
+    return true
+end
+
+-- The enemy heroes, as a list of tables:
+--   { pid, alive, isBot, level, pos, lastSeen }
+-- Uses the player-level API, which works in the bot VM where PlayerResource
+-- does not exist.
+function Compat.EnemyHeroes()
+    local out = {}
+    if not GetTeamPlayers or not GetOpposingTeam then return out end
+
+    local bot = GetBot and GetBot()
+    local team = nil
+    if bot and not bot:IsNull() and bot.GetTeam then
+        local ok, t = pcall(bot.GetTeam, bot)
+        if ok then team = t end
+    end
+    if not team and GetTeam then
+        local ok, t = pcall(GetTeam)
+        if ok then team = t end
+    end
+    if not team then return out end
+
+    local ok, enemyTeam = pcall(GetOpposingTeam)
+    if not ok or not enemyTeam then return out end
+
+    local ok2, players = pcall(GetTeamPlayers, enemyTeam)
+    if not ok2 or not players then return out end
+
+    for _, pid in ipairs(players) do
+        local alive = false
+        if IsHeroAlive then
+            local ok3, a = pcall(IsHeroAlive, pid)
+            if ok3 then alive = a and true or false end
+        end
+
+        local isBot = true
+        if IsPlayerBot then
+            local ok4, b = pcall(IsPlayerBot, pid)
+            if ok4 then isBot = b and true or false end
+        end
+
+        local level = 0
+        if GetHeroLevel then
+            local ok5, l = pcall(GetHeroLevel, pid)
+            if ok5 and l then level = l end
+        end
+
+        local pos, lastSeen = nil, 999
+        if GetHeroLastSeenInfo then
+            local ok6, info = pcall(GetHeroLastSeenInfo, pid)
+            if ok6 and info then
+                pos = info.location
+                if info.time_since_seen then lastSeen = info.time_since_seen end
+            end
+        end
+
+        out[#out + 1] = {
+            pid = pid, alive = alive, isBot = isBot,
+            level = level, pos = pos, lastSeen = lastSeen,
+        }
+    end
+    return out
+end
+
+-- The allied heroes, as unit handles.
+function Compat.TeamMembers()
+    local out = {}
+    if not GetTeamMember then return out end
+    for i = 1, 5 do
+        local ok, member = pcall(GetTeamMember, i)
+        if ok and member and not member:IsNull() then
+            out[#out + 1] = member
+        end
+    end
+    return out
+end
+
 return Compat
