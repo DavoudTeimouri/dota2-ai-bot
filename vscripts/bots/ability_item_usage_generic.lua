@@ -211,8 +211,50 @@ local function TowerPushTP(bot)
     return nil, nil
 end
 
+-- Blink Dagger engage. Only heroes whose ultimate is an "initiate" type blink
+-- in: their ult wants a crowd (Magnus RP, Enigma BH, Mars box), so blinking to
+-- the enemy line to land it is the play. Gated hard: two or more enemies must
+-- be in range, two or more allies must be nearby (never blink into a solo 1v5),
+-- and the ultimate must be castable, or the blink just delivers the bot to die.
+-- Returns the blink item and the enemy location to blink to, or nil.
+local function BlinkToEngage(bot)
+    if not bot or bot:IsNull() then return nil, nil end
+    local rules = HeroRules.For(HeroName(bot))
+    if not (rules and rules.ult == "initiate") then return nil, nil end
+    local blink = Compat.ItemByName(bot, "item_blink")
+    if not blink then return nil, nil end
+    -- The ultimate must be ready; otherwise there is nothing to land after the
+    -- blink and the bot has walked into range for free.
+    local ultReady = false
+    for i = 0, MAX_SLOTS - 1 do
+        local ab = Compat.AbilityInSlot(bot, i)
+        if ab and not ab:IsNull() then
+            local okU, isUlt = pcall(ab.IsUltimate, ab)
+            if okU and isUlt and ab.IsFullyCastable and ab:IsFullyCastable() then
+                ultReady = true
+            end
+        end
+    end
+    if not ultReady then return nil, nil end
+    local allies = Compat.Allies(bot, 1200)
+    if #allies < 2 then return nil, nil end
+    local enemies = Compat.Enemies(bot, 1000)
+    if #enemies < 2 then return nil, nil end
+    local target = enemies[1]
+    if target.GetLocation then
+        local ok, loc = pcall(target.GetLocation, target)
+        if ok and loc then return blink, loc end
+    end
+    return nil, nil
+end
+
 function AbilityUsage:GetItemUsage(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return nil end
+
+    -- Blink to engage before anything else: getting into range for the ult is
+    -- the first thing a blink-initiator should do when a fight is on.
+    local tpi, tploc = BlinkToEngage(bot)
+    if tpi then return tpi, tploc end
 
     -- Teleport to a friendly tower: defend one under attack, or push one.
     -- Defend first, since losing a tower is worse than missing a push.
