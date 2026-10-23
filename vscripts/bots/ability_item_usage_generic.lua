@@ -149,8 +149,42 @@ local function SmokeIsWorthIt(bot)
     return true
 end
 
+-- Teleport to a friendly tower that is under attack, when the defend desire
+-- is high enough to justify the scroll. Moves the bot instantly instead of
+-- walking the whole lane. Returns the scroll and the tower location, or nil.
+local function TowerDefendTP(bot)
+    if not bot or bot:IsNull() then return nil, nil end
+    local team = bot:GetTeam and bot:GetTeam(bot)
+    if not team then return nil, nil end
+    local tpscroll = Compat.ItemByName(bot, "item_tpscroll")
+    if not tpscroll then return nil, nil end
+    local bestLane, bestDesire = nil, 0
+    for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+        if GetDefendLaneDesire then
+            local ok, d = pcall(GetDefendLaneDesire, lane)
+            if ok and d and d > bestDesire then
+                bestDesire, bestLane = d, lane
+            end
+        end
+    end
+    if not bestLane or bestDesire < 0.5 then return nil, nil end
+    local towerConst = { [LANE_TOP] = _G.TOWER_TOP_1, [LANE_MID] = _G.TOWER_MID_1, [LANE_BOT] = _G.TOWER_BOT_1 }[bestLane]
+    if not towerConst then return nil, nil end
+    local ok, tower = pcall(GetTower, team, towerConst)
+    if not ok or not tower or tower:IsNull() or not tower:IsAlive() then return nil, nil end
+    if tower.GetLocation then
+        local ok2, loc = pcall(tower.GetLocation, tower)
+        if ok2 and loc then return tpscroll, loc end
+    end
+    return nil, nil
+end
+
 function AbilityUsage:GetItemUsage(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return nil end
+
+    -- Teleport to a friendly tower under attack instead of walking the lane.
+    local tpi, tploc = TowerDefendTP(bot)
+    if tpi then return tpi, tploc end
 
     local enemies = Compat.Enemies(bot, 900)
     if #enemies == 0 then return nil end
@@ -207,7 +241,11 @@ function AbilityUsage:ShouldBuyback(bot)
     if not bot or bot:IsNull() then return false end
     if bot:IsAlive() then return false end
     local cost = bot:GetBuybackCost()
-    return cost > 0 and bot:GetGold() >= cost
+    if cost == 0 or bot:GetGold() < cost then return false end
+    -- Only buy back when there is a fight to join. A dead bot that buys back
+    -- walks back alone; that is a waste of gold unless allies are nearby.
+    local allies = Compat.Allies(bot, 1400)
+    return #allies > 0
 end
 
 -- Spend an unspent ability point. The hero's own level order wins when
