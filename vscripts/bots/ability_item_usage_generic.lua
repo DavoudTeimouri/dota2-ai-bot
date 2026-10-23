@@ -179,11 +179,46 @@ local function TowerDefendTP(bot)
     return nil, nil
 end
 
+-- Teleport to a friendly tower in the lane the team most wants to push, when
+-- the push desire is high and the bot holds a TP scroll. Pushing from base is
+-- the whole point of the scroll; walking back wastes the advantage. The push
+-- desire already accounts for a numbers advantage, so a high value is a safe
+-- signal to commit.
+local function TowerPushTP(bot)
+    if not bot or bot:IsNull() then return nil, nil end
+    local team = bot:GetTeam and bot:GetTeam(bot)
+    if not team then return nil, nil end
+    local tpscroll = Compat.ItemByName(bot, "item_tpscroll")
+    if not tpscroll then return nil, nil end
+    local bestLane, bestDesire = nil, 0
+    for _, lane in ipairs({ LANE_TOP, LANE_MID, LANE_BOT }) do
+        if GetPushLaneDesire then
+            local ok, d = pcall(GetPushLaneDesire, lane)
+            if ok and d and d > bestDesire then
+                bestDesire, bestLane = d, lane
+            end
+        end
+    end
+    if not bestLane or bestDesire < 0.6 then return nil, nil end
+    local towerConst = { [LANE_TOP] = _G.TOWER_TOP_1, [LANE_MID] = _G.TOWER_MID_1, [LANE_BOT] = _G.TOWER_BOT_1 }[bestLane]
+    if not towerConst then return nil, nil end
+    local ok, tower = pcall(GetTower, team, towerConst)
+    if not ok or not tower or tower:IsNull() or not tower:IsAlive() then return nil, nil end
+    if tower.GetLocation then
+        local ok2, loc = pcall(tower.GetLocation, tower)
+        if ok2 and loc then return tpscroll, loc end
+    end
+    return nil, nil
+end
+
 function AbilityUsage:GetItemUsage(bot)
     if not bot or bot:IsNull() or not bot:IsAlive() then return nil end
 
-    -- Teleport to a friendly tower under attack instead of walking the lane.
+    -- Teleport to a friendly tower: defend one under attack, or push one.
+    -- Defend first, since losing a tower is worse than missing a push.
     local tpi, tploc = TowerDefendTP(bot)
+    if tpi then return tpi, tploc end
+    tpi, tploc = TowerPushTP(bot)
     if tpi then return tpi, tploc end
 
     local enemies = Compat.Enemies(bot, 900)
