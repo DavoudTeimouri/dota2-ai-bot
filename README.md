@@ -1,214 +1,231 @@
-# AetherWeaver
+# Open Hyper AI (OHA) — Dota 2 Bot Scripts
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Dota 2](https://img.shields.io/badge/Dota_2-Workshop_Addon-green.svg)](https://www.dota2.com/workshop/)
+**The most feature-rich custom bot script for Dota 2.** Play against bots that actually fight, farm, push, and use items intelligently.
 
-A smart Dota 2 bot that plays like a pro, communicates via chat wheel and messages, hints to human players, and works as a team worker. No external dependencies — pure Lua Workshop addon. Synced to **Patch 7.41f**.
+> **To play:** Create a **Custom Lobby** and select **Local Host** as the server location. Bots should have names ending with **`.OHA`** when installed correctly.
 
-## Features
-What the bot actually does today. Every line is backed by code in `vscripts/bots/`.
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298) | [GitHub](https://github.com/forest0xia/dota2bot-OpenHyperAI) | [Feature Requests](https://github.com/forest0xia/dota2bot-OpenHyperAI/issues?q=is%3Aissue+is%3Aopen+%5BFeature+request%5D)
 
-- **Hero Selection**: Position‑based hero pools with attribute filtering and counter‑pick weights (`hero_selection.lua`). It calls `SelectHero()` so the pick is locked in, not just announced in chat. `IsPlayerInHeroSelectionControl()` says whose turn it is, and the Captains Mode queries (`IsCMBannedHero`, `IsCMPickedHero`) say which heroes are still out. Two bots on the same team never pick the same hero.
-- **Custom Bot Names**: Human‑like names from a 250‑name pool across EN/ZH/KO/RU/ES, assigned in `hero_selection.lua` so they apply in every game phase.
-- **Lane Assignment**: Role‑based lane with the correct per‑team safe/offlane mapping. Lanes use the API's int constants (`LANE_TOP/MID/BOT`), normalised through `bot_lane.lua`.
-- **Nine Competing Modes**: The engine calls `GetDesire()` every frame in each `mode_*_generic.lua` and runs the highest one:
-  - `mode_laning_generic.lua` – hold lane, **attack the nearest enemy hero in range**, last hit, deny, and push the nearest enemy creep when no clean last hit exists
-  - `mode_farm_generic.lua` – neutral creeps (tiered) and lane wave
-  - `mode_ward_generic.lua` – place wards (observer, sentry, or dispensary) at per‑lane spots, nearest first
-  - `mode_rune_generic.lua` – contest power (2‑min) and bounty (5‑min) runes
-  - `mode_item_generic.lua` – walk to the shop when the next item is affordable
-  - `mode_push_lane_generic.lua` – push with a big wave and a numbers advantage
-  - `mode_defend_generic.lua` – defend the tier‑1 tower that is under attack
-  - `mode_retreat_generic.lua` – disengage when hurt and outnumbered
-  - `mode_team_roam_generic.lua` – join allied fights, focus the lowest‑HP enemy
-- **Team Strategy**: `team_desires.lua` implements the engine's team‑desire contract — `UpdatePushLaneDesires()`, `UpdateDefendLaneDesires()`, `UpdateFarmLaneDesires()`, `UpdateRoamDesire()` and `UpdateRoshanDesire()`. The engine stores those answers and the modes read them back through `GetPushLaneDesire(lane)`, `GetDefendLaneDesire(lane)`, `GetRoamDesire()` and `GetRoshanTarget()`. The push desire is higher in the lane the team outnumbers the enemy in, the defend desire spikes when a tier‑1 tower is being hit, and the farm desire drops in a contested lane.
-- **Lane Rotation**: after 8 minutes a support rotates to whichever lane the team wants to defend; after 12 minutes an offlane helps the safe lane when the team wants to push it. The carry never leaves the safe lane.
-- **Item Purchases**: Full per‑role build order (starter → core → luxury) with per‑item shop gating (home/side/secret) and gold thresholds. Repeated items (two tangos, three wards) are counted properly, so the bot buys every copy.
-- **Per‑Hero Item Builds** (`hero_builds.lua`): the role build is the default; a hero whose role build is materially wrong for it gets its own — an early Manta for a carry that has to fight, Aghanim's Scepter and a Meteor Hammer for a mage that has to burst, a Black King Bar for an offlane that has to survive the lane.
-- **Patch‑Proof Prices**: the price and the shop come from the live game (`GetItemCost`, `IsItemPurchasedFromSecretShop`, `IsItemPurchasedFromSideShop`) instead of a hand‑kept table, so an item that moves shops or changes price between patches needs no code change. `GetItemStockCount` stops the bot trying to buy an empty shelf.
-- **Ability Usage**: Picks the best castable ability and the best target each frame. Targets are scored by distance, low HP, and disabled status; **magic‑immune enemies are heavily deprioritized** so spells aren't wasted on units they can't affect.
-- **Per‑Hero Rules** (`hero_rules.lua`): each hero the bot can pick has an ultimate rule — `always`, `initiate`, `burst`, `defend`, `transform` or `dodge` — so a Lion ult is saved for a low target while a Zeus ult is used the moment it is in range. Heroes whose level order differs from the default (Anti‑Mage, Invoker, Zeus, Puck, Faceless Void, Lion, Ogre Magi, Crystal Maiden, Lich, Bane) level their abilities in the right order.
-- **Item Active Usage**: Dust is cast on self (no target), Orchid of Malevolence on the nearest valid, non‑magic‑immune enemy. A neutral item picked up from a camp (slot 16) is used in a fight.
-- **Skill Levelling**: Unspent ability points are spent as they appear, in the hero's own order when it has one.
-- **Buyback**: Bought when dead, gold covers the cost, **and at least one ally is within 1400**. A bot that buys back alone just walks back to feed, so the gold is saved for a fight it can actually join.
-- **Runes**: power and bounty runes are claimed per bot, so the team spreads over the spots instead of five bots walking to the same rune. The mid takes the power rune, because the buff is team-wide and it is closest to both spots.
-- **Glyph of Fortification**: pressed by one bot while a tier‑1 tower is being hit, instead of five bots all pressing it.
-- **Smoke of Deceit**: used as a group gank, only when two or more allies are nearby. A lone bot using it just walks into a gank by itself.
-- **Courier**: delivers the stashed starting items, then runs items to a teammate who is stuck in lane without wards.
-- **API Compatibility Layer** (`bot_compat.lua`): The bot scripting API ships in more than one shape. Every uncertain call (hero queries, inventory, ability slots, attack, move, cast, level‑up, neutral items, towers, team members) goes through this module, which tries the documented form first and falls back to the older spelling. A missing method returns "nothing found" instead of raising, so no single API difference can freeze a bot. **Validity helpers** (`IsValid`, `IsValidHero`, `IsInRange`, `GetHP`, `GetMP`, `IsMagicImmune`, `IsDisabled`, `IsRetreating`) let ability and item logic skip null/invalid/magic-immune targets safely.
-- **Human Detection**: `IsPlayerBot()` tells a human from a bot without `PlayerResource`, so the roam desire is higher when a human core is on the enemy team, and `GetNetWorth()` gives the net‑worth comparison the push and defend desires are built on.
-- **Chat**: Contextual periodic messages (greeting, chit‑chat every 15s, a timed line every 60s) sent with `bot:ActionImmediate_Chat`. Team‑only, because the bot VM has no way to address one player. The bot can tell a human from a bot, but it cannot read a human's chat.
-- **Per‑Hero Overrides**: Hero‑specific ability and skill logic via `ability_item_usage_<hero>.lua` at the bot root (see `ability_item_usage_antimage.lua`).
+---
 
-### Not implemented
-These are not in the code, and the bot scripting VM cannot support them without a server plugin:
-- **Chat commands** (`!push`, `!roshan`, `!ward`, `!lane`). The bot VM has no `player_chat` event and no `GameRules:SendCustomMessage`, so a bot cannot read player chat. The only chat API is `ActionImmediate_Chat`, which sends.
-- **Pause‑on‑kill, sprays, chat wheels.** They need `GameRules` or a server plugin, both of which a bot script does not get.
-- **Roshan execution.** The team sets the Roshan desire, but the API exposes no Roshan position, so the bot cannot walk to the pit. The engine's own Roshan mode uses that desire.
-- **Per‑hero overrides as separate files.** Every hero is covered by `hero_rules.lua` and `hero_builds.lua` rather than 100+ near‑identical modules. A hero that needs genuinely bespoke logic still gets an `ability_item_usage_<hero>.lua` at the bot root.
+## What Makes This Different
 
-## Bot Name
-**AetherWeaver**
+- **127 heroes supported** on Patch 7.41/7.41a — including Largo, Kez, Ringmaster, Invoker, Techies, Meepo, Lone Druid, and more
+- **Bots actually play the game** — they lane, gank, push towers, defend, farm jungle, take Roshan, and use active items
+- **Dynamic difficulty (FretBots mode)** — bots get unfair bonuses that scale with difficulty for a real challenge
+- **Bots communicate** — they announce pushes, defends, Roshan, and respond to your pings with "On my way!" (in 4 languages)
+- **10+ Game modes supported** — All pick, Turbo, All random, Captain mode, 1v1 mid, All Random Deathmatch, etc.
+- **Customizable everything** — bot names, roles, hero picks, bans, item builds, skill builds, and more
+- **AI Chatbot** — bots chat like real (toxic) players (requires FretBots mode)
+- **All roles supported** — deterministic position 1-5 lane assignment
+
+---
+
+## Quick Start
+
+1. Subscribe on [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298)
+2. Create a **Custom Lobby** with **Local Host** server
+3. Start the game — bots auto-pick and play
+
+For **FretBots mode** (harder bots, neutral items, chatbot): [Manual installation guide](https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/68)
+
+---
+
+## In-Game Commands
+
+| Command | Description |
+|---|---|
+| `!pos X` | Swap your role with a bot (e.g., `!pos 2` for mid) |
+| `!Xpos Y` | Reassign bot positions (e.g., `!3pos 5` = 3rd bot plays pos 5) |
+| `!pick HERO` | Pick a hero (`!pick sniper`, or `/all !pick sniper` for enemy) |
+| `!ban HERO` | Ban a hero from being picked |
+| `!sp XX` | Set bot language (`en`, `zh`, `ru`, `ja`) |
+
+Use [internal hero names](https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71) if short names overlap (e.g., `!pick npc_dota_hero_keeper_of_the_light`). Batch commands work too: `!pick io; !ban sniper`.
+
+---
+
+## Bot Roles & Positioning
+
+Lobby slot order = position assignment (1-5):
+
+| Position | Lane |
+|---|---|
+| Pos 1 (Carry) + Pos 5 (Hard Support) | Safe Lane |
+| Pos 2 (Mid) | Mid Lane |
+| Pos 3 (Offlane) + Pos 4 (Soft Support) | Offlane |
+
+Customize picks, bans, and roles in [`Customize/general.lua`](vscripts/bots/Customize/general.lua).
+
+---
+
+## Customization
+
+| What | Where |
+|---|---|
+| General settings (picks, bans, names, roles) | [`Customize/general.lua`](vscripts/bots/Customize/general.lua) |
+| Per-hero settings (items, skills) | [`Customize/hero/viper.lua`](vscripts/bots/Customize/hero/viper.lua) |
+| FretBots difficulty tuning | [`FretBots/SettingsDefault.lua`](vscripts/bots/FretBots/SettingsDefault.lua) |
+
+**Permanent customization** (survives Workshop updates): Copy the `Customize` folder to `<Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/game/Customize>`.
+
+---
+
+## Game Modes
+
+Supports most game modes (10+). See [full compatibility discussion](https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/72).
+
+---
+
+## Offline / LAN Play
+
+You can start a bot game directly from the console without network or clicking UI buttons — useful for offline play, LAN parties, or quick testing. See [play offline setup guide](https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/135).
+
+---
 
 ## Files
+
 ```
 dota2-ai-bot/
-├── addoninfo.txt              # Workshop metadata
-├── LICENSE                    # MIT License
-├── CONTRIBUTING.md            # Contribution guidelines
-├── CODE_OF_CONDUCT.md         # Code of Conduct
-├── SECURITY.md                # Security policy
-├── README.md                  # This file
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   └── bug_report.yml     # Bug report template
-│   └── PULL_REQUEST_TEMPLATE.md
-└── vscripts/
-    └── bots/
-        ├── ability_item_usage_generic.lua   # Generic ability/item/buyback/level-up hooks
-        ├── ability_item_usage_antimage.lua  # Anti‑Mage per‑hero override (example)
-        ├── bot_compat.lua                   # API compatibility layer (try documented, fall back)
-        ├── bot_generic.lua                  # Minion AI entry point (MinionThink only)
-        ├── bot_lane.lua                     # Lane constants + role resolution helper
-        ├── bot_names.lua                    # Human‑like name pool (EN/ZH/KO/RU/ES)
-        ├── courier_generic.lua              # Courier logic (the hook is in the ability file)
-        ├── diagnostics.lua                  # Console report: API shape, state, actions
-        ├── hero_builds.lua                  # Per‑hero item build overrides
-        ├── hero_rules.lua                   # Per‑hero ultimate rule + level order
-        ├── hero_selection.lua               # Hero pick/ban phase (SelectHero) + naming
-        ├── init.lua                         # Message library + lane upkeep (BotThink)
-        ├── item_purchase_generic.lua        # Generic item purchase hook with build orders
-        ├── rune_generic.lua                 # Rune reset stub (required by engine)
-        ├── skill_build_generic.lua          # Skill build hook (forwards to ability_item_usage)
-        ├── team_desires.lua                 # Team desire calculator + the engine's five hooks
-        ├── mode_defend_generic.lua          # Defend mode (tier‑1 tower under attack)
-        ├── mode_farm_generic.lua            # Farm mode (neutral creeps + lane wave)
-        ├── mode_item_generic.lua            # Item/shop mode (walk to shop when affordable)
-        ├── mode_laning_generic.lua          # Laning mode (last hit + deny)
-        ├── mode_push_lane_generic.lua       # Push mode (wave + numbers advantage)
-        ├── mode_retreat_generic.lua         # Retreat mode (low HP + outnumbered)
-        ├── mode_team_roam_generic.lua       # Team roam mode (join allied fights)
-        ├── mode_ward_generic.lua            # Ward mode (per‑lane ward spots)
-        └── mode_rune_generic.lua            # Rune mode (power + bounty runes)
+├── vscripts/bots/
+│   ├── bot_generic.lua        # Per-bot entry point
+│   ├── hero_selection.lua     # Hero picking/banning
+│   ├── item_purchase_generic.lua   # Item purchase state machine
+│   ├── ability_item_usage_generic.lua # Ability/item active-use for all heroes
+│   ├── FretBots.lua           # Enhanced difficulty entry point
+│   ├── mode_assemble_generic.lua      # Human ping response
+│   ├── mode_attack_generic.lua        # General attacking
+│   ├── mode_defend_tower_bot_generic.lua   # Defend bot tower
+│   ├── mode_defend_tower_mid_generic.lua   # Defend mid tower
+│   ├── mode_defend_tower_top_generic.lua   # Defend top tower
+│   ├── mode_farm_generic.lua            # Jungle/creep farming
+│   ├── mode_laning_generic.lua          # Early laning, last-hitting
+│   ├── mode_outpost_generic.lua         # Outpost control
+│   ├── mode_push_tower_bot_generic.lua  # Push bot tower
+│   ├── mode_push_tower_mid_generic.lua  # Push mid tower
+│   ├── mode_push_tower_top_generic.lua  # Push top tower
+│   ├── mode_retreat_generic.lua         # Defensive retreat
+│   ├── mode_roam_generic.lua            # Solo ganking
+│   ├── mode_roshan_generic.lua          # Roshan hunt
+│   ├── mode_rune_generic.lua            # Rune pickup
+│   ├── mode_secret_shop_generic.lua     # Secret shop runs
+│   ├── mode_side_shop_generic.lua       # Side shop runs
+│   ├── mode_team_roam_generic.lua       # Group ganking
+│   ├── mode_ward_generic.lua            # Ward placement
+│   ├── BotLib/              # 127 per-hero builds (items, skills, ability logic)
+│   │   ├── hero_axe.lua, hero_crystal_maiden.lua, ...
+│   ├── FunLib/              # Core libraries and utilities
+│   │   ├── jmz_func.lua     # Main utility library (IsValid, IsInRange, GetHP, ...)
+│   │   ├── aba_item.lua     # Item system (GetItemComponents-based recipes)
+│   │   ├── aba_skill.lua    # Skill/ability system (dynamic slot reading)
+│   │   ├── aba_role.lua     # Role/position assignment
+│   │   ├── aba_ward_utility.lua # Ward spot logic
+│   │   ├── spell_list.lua   # Ability weight database (all heroes)
+│   │   ├── spell_prob_list.lua   # Ability probability weights
+│   │   ├── localization.lua # Chat translations (en/zh/ru/ja)
+│   │   └── ... (28 more modules)
+│   ├── FretBots/            # Enhanced difficulty mode
+│   │   ├── SettingsDefault.lua       # Difficulty tuning
+│   │   ├── SettingsNeutralItemTable.lua   # Neutral items + enchantments
+│   │   ├── HeroNames.lua      # Hero name localizations
+│   │   └── matchups_data.lua         # Hero matchup database
+│   ├── Buff/                # Buff mode (enhanced neutral items)
+│   │   └── NeutralItems.lua  # Neutral item tier lists + distribution
+│   ├── Customize/           # User-editable settings
+│   │   ├── general.lua      # Team-level settings (picks, bans, roles)
+│   │   └── hero/            # Per-hero overrides
+│   ├── ts_libs/             # TypeScript source (compiles to Lua via tstl)
+│   │   └── dota/heroes.lua  # HeroName enum
+│   └── Install-to-vscript/  # Quick-install scripts for Steam Workshop folder
+│       ├── quick-install-oha.bat
+│       ├── quick-install-oha-cn.bat
+│       ├── quick-install-oha-mac.sh
+│       └── quick-install-oha-linux.sh
 ```
 
-## Tests
-The bot logic runs headless under Lua 5.1, so the failure modes can be
-reproduced without launching Dota 2:
+---
 
-```
-lua5.1 tests/test_runtime.lua       # the two crashes that froze every bot
-lua5.1 tests/test_engine_hooks.lua  # every engine hook is a global function
-lua5.1 tests/test_probe.lua         # executes the real bot code against a fake engine
-lua5.1 tests/test_lobby.lua         # one full game frame: bot must move and must buy
-lua5.1 tests/test_team.lua          # team desire contract, defend mode, per‑hero rules
-lua5.1 tests/test_builds.lua        # per‑hero item builds, live prices, shop, stock
-```
+## Developer Documentation
 
-`test_lobby.lua` is the one that matters: it drives the whole hook sequence
-with a fake engine and asserts the bot issues a movement order, buys an item
-at the fountain and spends its ability points.
-
-## How to Publish to Steam Workshop
-1. Clone or download this repository.
-2. Open **Dota 2 Workshop Tools** (DLC required).
-3. In the **Addon** panel, click **Publish** → select this folder.
-4. Fill in title ("AetherWeaver"), description, tags (dota2, ai, bot).
-5. Set visibility to **Public** or **Friends Only**.
-6. Click **Upload**.
-
-## Running the Bot Locally (without Workshop) and use for lobby
-You can test the bot in a local lobby using the **Local DevScript** option:
-
-1. Ensure you have Dota 2 Beta and enable cheats in lobby settings.
-2. Place the entire `vscripts/bots` folder into a temporary location, e.g. `/tmp/dota2_bot/`.
-3. In the lobby console, run:
-   ```
-   dota_launch_custom_game <map_name> -vscripts /tmp/dota2_bot
-   ```
-   (Replace `<map_name>` with a map like `empty` or use the workshop ID if needed.)
-   Alternatively, after launching a cheat-enabled lobby, you can reload the script with:
-   ```
-   script_reload vscripts/bots/bot_generic.lua
-   ```
-   assuming the bot folder is mounted at `vscripts/` relative to the game.
-4. The bot will load and you should see its name and initial chat messages.
-5. Use `script_reload` to iterate on changes without restarting the lobby.
-
-### Verifying it in the lobby
-The bot prints a **diagnostics report** into the console: once at the horn and
-then every 30 seconds. It is the fastest way to tell a working bot from a
-bot that is standing still.
-
-```
-=========================================================
- AetherWeaver diagnostics    t=300
-=========================================================
---- API shape ---
-[heroQuery] new
-[position] new
-[levelUp] new
-[selectHero] yes
-...
---- bot ---
-[hero] npc_dota_hero_antimage
-[role] carry
-[lane] 3
-[gold] 600
-[atFountain] true
---- team ---
-[push.top] 0.12
-[defend.bot] 0.44
-[roam] 0.00
-[roshan] 0.00
-[enemies] 5
-[enemiesHuman] 1
---- actions since the last report ---
-[moves] 18
-[attacks] 4
-[casts] 7
-[levels] 1
-[purchases] 2
-=========================================================
-```
-
-What to look at:
-
-| Line | What it means when it is wrong |
+| Document | Description |
 |---|---|
-| `[heroQuery] none` | The bot cannot see enemies. Nothing else will work until the hero query shape is right. |
-| `[hero] nil` | The bot has no hero, so it cannot move or buy. The pick never happened. |
-| `[moves] 0` | The bot is not moving. Check `[atFountain]` and the team desires below it. |
-| `[purchases] 0` | The bot is not buying. It has to be standing at the shop: check `[atFountain]`. |
-| `[levels] 0` with `[abilityPoints] > 0` | The ability level-up call is not the shape the VM wants. |
-| `[push.*] err` | The engine did not call `UpdatePushLaneDesires()`, so the team has no plan. |
+| [`docs/ARCHITECTURE.md`](https://github.com/forest0xia/dota2bot-OpenHyperAI/blob/main/docs/ARCHITECTURE.md) | Complete codebase architecture, file map, naming conventions, all systems explained |
+| [`docs/PATCH_UPDATE_GUIDE.md`](https://github.com/forest0xia/dota2bot-OpenHyperAI/blob/main/docs/PATCH_UPDATE_GUIDE.md) | Step-by-step runbook for updating when a new Dota 2 patch drops |
+| [`docs/BOT_API_REFERENCE.md`](https://github.com/forest0xia/dota2bot-OpenHyperAI/blob/main/docs/BOT_API_REFERENCE.md) | Comprehensive Valve bot scripting API reference with examples |
 
-Paste the report back and it says exactly what is wrong, without guessing
-from the bot's behaviour in the game.
+### Internal Name References
 
-## Chat Commands
-Not supported. The bot scripting VM has no `player_chat` event and no
-`GameRules:SendCustomMessage`, so a bot can only send chat
-(`bot:ActionImmediate_Chat`), never read it. See "Not implemented" above.
+Dota 2 bot scripts use internal code names for heroes, items, and abilities — different from in-game display names. Verify against:
 
-## Customizing the Bot
-Edit `vscripts/bots/init.lua` to change:
-- Hero pool and role mapping
-- Message library (periodic messages)
-- Chat command handling
-- Strategy logic in `BotThink`
+| Resource | What It Contains |
+|---|---|
+| [Liquipedia Cheats (Item Names)](https://liquipedia.net/dota2/Cheats) | Authoritative `item_*` internal names |
+| [d2vpkr npc_abilities.txt](https://raw.githubusercontent.com/dotabuff/d2vpk/master/dota_pak01/scripts/npc/npc_abilities.txt) | All ability internal names and KV data |
+| [Dota 2 Patch Data API](https://www.dota2.com/datafeed/patchnoteslist?language=english) | Official patch notes, machine-readable |
+| [Modifier Names (Valve Wiki)](https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools/Scripting/Built-In_Modifier_Names) | `modifier_*` buff/debuff names |
 
-Edit hero‑specific overrides at the bot root (`ability_item_usage_<hero>.lua` and `item_purchase_<hero>.lua`) to customize item builds, skill builds, and ability usage for any hero.
+---
 
-## Requirements
-- Dota 2 with Workshop Tools DLC
-- Dota 2 Beta (for custom lobbies with addons)
+## Contribute
+
+- Contributions welcome on [GitHub](https://github.com/forest0xia/dota2bot-OpenHyperAI)
+- Custom item/skill builds don't need PRs — just tweak locally
+- Future development is in **TypeScript** for better maintainability
+- [Open feature requests](https://github.com/forest0xia/dota2bot-OpenHyperAI/issues?q=is%3Aissue+is%3Aopen+%5BFeature+request%5D)
+
+---
+
+## What's Next
+
+- Current bot playstyle is limited by Valve's API. **We need ML/LLM bots like OpenAI Five!**
+- Planned improvements:
+  - Smarter laning, pushing, ganking
+  - Stronger spell casting (Invoker, Rubick, Morphling, etc.)
+  - Better support for bugged heroes (Dark Willow, IO, Lone Druid, Muerta, etc.)
+  - Full game mode support + ongoing patch fixes
+- [Feedback to Valve Dota2 bot team](https://www.reddit.com/r/DotA2/comments/1ezxpav/)
+
+---
+
+## Useful Resources
+
+| Resource | Description |
+|---|---|
+| [Dota2 AI Development Tutorial](https://www.adamqqq.com/ai/dota2-ai-devlopment-tutorial.html) | Comprehensive guide by adamqqq |
+| [Valve Bot Scripting Intro](https://developer.valvesoftware.com/wiki/Dota_Bot_Scripting) | Official Valve documentation |
+| [Lua Bot APIs (moddota)](https://docs.moddota.com/lua_bots/) | Community API docs |
+| [Liquipedia Cheats (Internal Names)](https://liquipedia.net/dota2/Cheats) | Item/hero/ability code names |
+| [npc_abilities.txt](https://raw.githubusercontent.com/dotabuff/d2vpk/master/dota_pak01/scripts/npc/npc_abilities.txt) | Ability metadata |
+| [Enums & APIs (moddota)](https://moddota.com/api/#!/vscripts/dotaunitorder_t) | Enum reference |
+| [Modifier Names](https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools/Scripting/Built-In_Modifier_Names) | Buff/debuff modifier names |
+
+---
+
+## Support
+
+- Contribute on GitHub
+- Or [buy me a coffee](https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/74)
+
+---
+
+## Credits
+
+Built on top of Valve's default bots + contributions from many talented authors:
+
+- New Beginner AI ([dota2jmz@163.com](mailto:dota2jmz@163.com))
+- Tinkering About ([ryndrb](https://github.com/ryndrb/dota2bot))
+- Ranked Matchmaking AI ([adamqqq](https://github.com/adamqqqplay/dota2ai))
+- fretbots ([fretmute](https://github.com/fretmute/fretbots))
+- BOT Experiment (Furiospuppy)
+- ExtremePush ([insraq](https://github.com/insraq/dota2bots))
+- And all other contributors who made bot games better
+
+---
 
 ## License
+
 MIT — see [LICENSE](LICENSE) for details.
 
-## Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
 ## Security
+
 See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
