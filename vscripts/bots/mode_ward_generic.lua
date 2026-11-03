@@ -9,6 +9,7 @@ local Compat = require("bot_compat")
 local function HasObserver(bot)
     return Compat.HasItem(bot, "item_ward_observer")
         or Compat.HasItem(bot, "item_ward_sentry")
+        or Compat.HasItem(bot, "item_ward_dispensary")
 end
 
 -- Known warding spots by lane: {x, y} offsets from lane front toward river/jungle.
@@ -71,7 +72,9 @@ end
 
 -- Resolve a ward handle by name; the slot is not fixed.
 local function FindWard(bot)
-    local ward = Compat.ItemByName(bot, "item_ward_observer")
+    local ward = Compat.ItemByName(bot, "item_ward_dispensary")
+    if ward then return ward end
+    ward = Compat.ItemByName(bot, "item_ward_observer")
     if ward then return ward end
     return Compat.ItemByName(bot, "item_ward_sentry")
 end
