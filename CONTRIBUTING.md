@@ -1,6 +1,6 @@
-# Contributing to Open Hyper AI (OHA)
+# Contributing to AetherWeaver (Open Hyper AI)
 
-Thank you for considering contributing to Open Hyper AI!
+Thank you for considering contributing to AetherWeaver, built on Open Hyper AI!
 
 ## How to Contribute
 
