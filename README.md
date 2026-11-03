@@ -3,11 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Dota 2](https://img.shields.io/badge/Dota_2-Workshop_Addon-green.svg)](https://www.dota2.com/workshop/)
 
-A smart Dota 2 bot built on [forest0xia/dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI) — bots that actually fight, farm, push, and use items intelligently.
+A smart Dota 2 bot that actually fights, farms, pushes, and uses items intelligently. Pure Lua Workshop addon, no external dependencies.
 
-> **To play:** Create a **Custom Lobby** and select **Local Host** as the server location. Bots should have names ending with **`.OHA`** when installed correctly.
-
-[Steam Workshop (OHA)](https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298) | [OHA GitHub](https://github.com/forest0xia/dota2bot-OpenHyperAI)
+> **To play:** Create a **Custom Lobby** and select **Local Host** as the server location.
 
 ---
 
@@ -26,11 +24,10 @@ A smart Dota 2 bot built on [forest0xia/dota2bot-OpenHyperAI](https://github.com
 
 ## Quick Start
 
-1. Subscribe on [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3246316298)
-2. Create a **Custom Lobby** with **Local Host** server
-3. Start the game — bots auto-pick and play
-
-For **FretBots mode** (harder bots, neutral items, chatbot): [Manual installation guide](https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/68)
+1. Download or clone this repository.
+2. Place the `vscripts/bots` folder into your Dota 2 addon folder.
+3. Create a **Custom Lobby** with **Local Host** server.
+4. Start the game — bots auto-pick and play.
 
 ---
 
@@ -44,7 +41,7 @@ For **FretBots mode** (harder bots, neutral items, chatbot): [Manual installatio
 | `!ban HERO` | Ban a hero from being picked |
 | `!sp XX` | Set bot language (`en`, `zh`, `ru`, `ja`) |
 
-Use [internal hero names](https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions/71) if short names overlap. Batch commands work too: `!pick io; !ban sniper`.
+Use internal hero names if short names overlap. Batch commands work too: `!pick io; !ban sniper`.
 
 ---
 
@@ -70,7 +67,19 @@ Customize picks, bans, and roles in [`Customize/general.lua`](vscripts/bots/Cust
 | Per-hero settings (items, skills) | [`Customize/hero/viper.lua`](vscripts/bots/Customize/hero/viper.lua) |
 | FretBots difficulty tuning | [`FretBots/SettingsDefault.lua`](vscripts/bots/FretBots/SettingsDefault.lua) |
 
-**Permanent customization** (survives Workshop updates): Copy the `Customize` folder to `<Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/game/Customize>`.
+**Permanent customization** (survives updates): Copy the `Customize` folder to `<Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/game/Customize>`.
+
+---
+
+## Game Modes
+
+Supports most game modes (10+).
+
+---
+
+## Offline / LAN Play
+
+You can start a bot game directly from the console without network or clicking UI buttons — useful for offline play, LAN parties, or quick testing.
 
 ---
 
@@ -127,7 +136,7 @@ dota2-ai-bot/
 │   │   └── hero/            # Per-hero overrides
 │   ├── ts_libs/             # TypeScript source (compiles to Lua via tstl)
 │   │   └── dota/heroes.lua  # HeroName enum
-│   └── Install-to-vscript/  # Quick-install scripts for Steam Workshop folder
+│   └── Install-to-vscript/  # Quick-install scripts
 │       ├── quick-install-oha.bat
 │       ├── quick-install-oha-cn.bat
 │       ├── quick-install-oha-mac.sh
@@ -136,36 +145,7 @@ dota2-ai-bot/
 
 ---
 
-## Developer Documentation
-
-| Document | Description |
-|---|---|
-| [`docs/ARCHITECTURE.md`](https://github.com/forest0xia/dota2bot-OpenHyperAI/blob/main/docs/ARCHITECTURE.md) | Complete codebase architecture, file map, naming conventions, all systems explained |
-| [`docs/PATCH_UPDATE_GUIDE.md`](https://github.com/forest0xia/dota2bot-OpenHyperAI/blob/main/docs/PATCH_UPDATE_GUIDE.md) | Step-by-step runbook for updating when a new Dota 2 patch drops |
-| [`docs/BOT_API_REFERENCE.md`](https://github.com/forest0xia/dota2bot-OpenHyperAI/blob/main/docs/BOT_API_REFERENCE.md) | Comprehensive Valve bot scripting API reference with examples |
-
-### Internal Name References
-
-Dota 2 bot scripts use internal code names for heroes, items, and abilities — different from in-game display names. Verify against:
-
-| Resource | What It Contains |
-|---|---|
-| [Liquipedia Cheats (Item Names)](https://liquipedia.net/dota2/Cheats) | Authoritative `item_*` internal names |
-| [d2vpkr npc_abilities.txt](https://raw.githubusercontent.com/dotabuff/d2vpk/master/dota_pak01/scripts/npc/npc_abilities.txt) | All ability internal names and KV data |
-| [Dota 2 Patch Data API](https://www.dota2.com/datafeed/patchnoteslist?language=english) | Official patch notes, machine-readable |
-| [Modifier Names (Valve Wiki)](https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools/Scripting/Built-In_Modifier_Names) | `modifier_*` buff/debuff names |
-
----
-
-## Contribute
-
-- Contributions welcome on [GitHub](https://github.com/forest0xia/dota2bot-OpenHyperAI)
-- Custom item/skill builds don't need PRs — just tweak locally in `Customize/hero/`
-- Future development is in **TypeScript** for better maintainability
-
----
-
-## Running the Bot Locally (without Workshop) and use for lobby
+## Running the Bot Locally
 
 You can test the bot in a local lobby using the **Local DevScript** option:
 
@@ -175,19 +155,17 @@ You can test the bot in a local lobby using the **Local DevScript** option:
    ```
    dota_launch_custom_game <map_name> -vscripts /tmp/dota2_bot
    ```
-   (Replace `<map_name>` with a map like `empty` or use the workshop ID if needed.)
 4. Alternatively, after launching a cheat-enabled lobby, reload the script with:
    ```
    script_reload vscripts/bots/bot_generic.lua
    ```
-   assuming the bot folder is mounted at `vscripts/` relative to the game.
 5. Use `script_reload` to iterate on changes without restarting the lobby.
 
 ---
 
 ## What's Next
 
-- Current bot playstyle is limited by Valve's API. **We need ML/LLM bots like OpenAI Five!**
+- Current bot playstyle is limited by Valve's API.
 - Planned improvements:
   - Smarter laning, pushing, ganking
   - Stronger spell casting (Invoker, Rubick, Morphling, etc.)
@@ -204,22 +182,13 @@ You can test the bot in a local lobby using the **Local DevScript** option:
 | [Valve Bot Scripting Intro](https://developer.valvesoftware.com/wiki/Dota_Bot_Scripting) | Official Valve documentation |
 | [Lua Bot APIs (moddota)](https://docs.moddota.com/lua_bots/) | Community API docs |
 | [Liquipedia Cheats (Internal Names)](https://liquipedia.net/dota2/Cheats) | Item/hero/ability code names |
-| [npc_abilities.txt](https://raw.githubusercontent.com/dotabuff/d2vpk/master/dota_pak01/scripts/npc/npc_abilities.txt) | Ability metadata |
 | [Modifier Names](https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools/Scripting/Built-In_Modifier_Names) | Buff/debuff modifier names |
 
 ---
 
 ## Credits
 
-Built on top of Valve's default bots + [forest0xia/dota2bot-OpenHyperAI](https://github.com/forest0xia/dota2bot-OpenHyperAI), which itself is built on contributions from:
-
-- New Beginner AI ([dota2jmz@163.com](mailto:dota2jmz@163.com))
-- Tinkering About ([ryndrb](https://github.com/ryndrb/dota2bot))
-- Ranked Matchmaking AI ([adamqqq](https://github.com/adamqqqplay/dota2ai))
-- fretbots ([fretmute](https://github.com/fretmute/fretbots))
-- BOT Experiment (Furiospuppy)
-- ExtremePush ([insraq](https://github.com/insraq/dota2bots))
-- And all other contributors who made bot games better
+Built on Valve's default bot framework, with community contributions from New Beginner AI, Tinkering About, Ranked Matchmaking AI, fretbots, BOT Experiment, ExtremePush, and others.
 
 ---
 

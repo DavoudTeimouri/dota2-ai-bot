@@ -1,6 +1,6 @@
-# Contributing to AetherWeaver (Open Hyper AI)
+# Contributing to AetherWeaver
 
-Thank you for considering contributing to AetherWeaver, built on Open Hyper AI!
+Thank you for considering contributing to AetherWeaver!
 
 ## How to Contribute
 
@@ -31,8 +31,7 @@ Use the GitHub issue tracker. Include:
 
 ## Patch Updates
 
-When a new Dota 2 patch drops, follow the runbook in
-[docs/PATCH_UPDATE_GUIDE.md](https://github.com/forest0xia/dota2bot-OpenHyperAI/blob/main/docs/PATCH_UPDATE_GUIDE.md):
+When a new Dota 2 patch drops, follow the patch-update runbook:
 items -> hero builds -> abilities -> neutrals -> actives -> map changes.
 Always verify ability names on Liquipedia before trusting patch note summaries.
 
