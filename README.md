@@ -12,9 +12,9 @@ What the bot actually does today. Every line is backed by code in `vscripts/bots
 - **Custom Bot Names**: Human‑like names from a 250‑name pool across EN/ZH/KO/RU/ES, assigned in `hero_selection.lua` so they apply in every game phase.
 - **Lane Assignment**: Role‑based lane with the correct per‑team safe/offlane mapping. Lanes use the API's int constants (`LANE_TOP/MID/BOT`), normalised through `bot_lane.lua`.
 - **Nine Competing Modes**: The engine calls `GetDesire()` every frame in each `mode_*_generic.lua` and runs the highest one:
-  - `mode_laning_generic.lua` – hold lane, last hit, deny own dying creeps
+  - `mode_laning_generic.lua` – hold lane, **attack the nearest enemy hero in range**, last hit, deny, and push the nearest enemy creep when no clean last hit exists
   - `mode_farm_generic.lua` – neutral creeps (tiered) and lane wave
-  - `mode_ward_generic.lua` – place wards at per‑lane spots, nearest first
+  - `mode_ward_generic.lua` – place wards (observer, sentry, or dispensary) at per‑lane spots, nearest first
   - `mode_rune_generic.lua` – contest power (2‑min) and bounty (5‑min) runes
   - `mode_item_generic.lua` – walk to the shop when the next item is affordable
   - `mode_push_lane_generic.lua` – push with a big wave and a numbers advantage
@@ -26,16 +26,16 @@ What the bot actually does today. Every line is backed by code in `vscripts/bots
 - **Item Purchases**: Full per‑role build order (starter → core → luxury) with per‑item shop gating (home/side/secret) and gold thresholds. Repeated items (two tangos, three wards) are counted properly, so the bot buys every copy.
 - **Per‑Hero Item Builds** (`hero_builds.lua`): the role build is the default; a hero whose role build is materially wrong for it gets its own — an early Manta for a carry that has to fight, Aghanim's Scepter and a Meteor Hammer for a mage that has to burst, a Black King Bar for an offlane that has to survive the lane.
 - **Patch‑Proof Prices**: the price and the shop come from the live game (`GetItemCost`, `IsItemPurchasedFromSecretShop`, `IsItemPurchasedFromSideShop`) instead of a hand‑kept table, so an item that moves shops or changes price between patches needs no code change. `GetItemStockCount` stops the bot trying to buy an empty shelf.
-- **Ability Usage**: Picks the best castable ability and the best target (closest + lowest HP) each frame.
+- **Ability Usage**: Picks the best castable ability and the best target each frame. Targets are scored by distance, low HP, and disabled status; **magic‑immune enemies are heavily deprioritized** so spells aren't wasted on units they can't affect.
 - **Per‑Hero Rules** (`hero_rules.lua`): each hero the bot can pick has an ultimate rule — `always`, `initiate`, `burst`, `defend`, `transform` or `dodge` — so a Lion ult is saved for a low target while a Zeus ult is used the moment it is in range. Heroes whose level order differs from the default (Anti‑Mage, Invoker, Zeus, Puck, Faceless Void, Lion, Ogre Magi, Crystal Maiden, Lich, Bane) level their abilities in the right order.
-- **Item Active Usage**: Dust is cast on self (no target), Orchid of Malevolence on an enemy. A neutral item picked up from a camp (slot 16) is used in a fight.
+- **Item Active Usage**: Dust is cast on self (no target), Orchid of Malevolence on the nearest valid, non‑magic‑immune enemy. A neutral item picked up from a camp (slot 16) is used in a fight.
 - **Skill Levelling**: Unspent ability points are spent as they appear, in the hero's own order when it has one.
-- **Buyback**: Bought when dead and gold covers the cost.
+- **Buyback**: Bought when dead, gold covers the cost, **and at least one ally is within 1400**. A bot that buys back alone just walks back to feed, so the gold is saved for a fight it can actually join.
 - **Runes**: power and bounty runes are claimed per bot, so the team spreads over the spots instead of five bots walking to the same rune. The mid takes the power rune, because the buff is team-wide and it is closest to both spots.
 - **Glyph of Fortification**: pressed by one bot while a tier‑1 tower is being hit, instead of five bots all pressing it.
 - **Smoke of Deceit**: used as a group gank, only when two or more allies are nearby. A lone bot using it just walks into a gank by itself.
 - **Courier**: delivers the stashed starting items, then runs items to a teammate who is stuck in lane without wards.
-- **API Compatibility Layer** (`bot_compat.lua`): The bot scripting API ships in more than one shape. Every uncertain call (hero queries, inventory, ability slots, attack, move, cast, level‑up, neutral items, towers, team members) goes through this module, which tries the documented form first and falls back to the older spelling. A missing method returns "nothing found" instead of raising, so no single API difference can freeze a bot.
+- **API Compatibility Layer** (`bot_compat.lua`): The bot scripting API ships in more than one shape. Every uncertain call (hero queries, inventory, ability slots, attack, move, cast, level‑up, neutral items, towers, team members) goes through this module, which tries the documented form first and falls back to the older spelling. A missing method returns "nothing found" instead of raising, so no single API difference can freeze a bot. **Validity helpers** (`IsValid`, `IsValidHero`, `IsInRange`, `GetHP`, `GetMP`, `IsMagicImmune`, `IsDisabled`, `IsRetreating`) let ability and item logic skip null/invalid/magic-immune targets safely.
 - **Human Detection**: `IsPlayerBot()` tells a human from a bot without `PlayerResource`, so the roam desire is higher when a human core is on the enemy team, and `GetNetWorth()` gives the net‑worth comparison the push and defend desires are built on.
 - **Chat**: Contextual periodic messages (greeting, chit‑chat every 15s, a timed line every 60s) sent with `bot:ActionImmediate_Chat`. Team‑only, because the bot VM has no way to address one player. The bot can tell a human from a bot, but it cannot read a human's chat.
 - **Per‑Hero Overrides**: Hero‑specific ability and skill logic via `ability_item_usage_<hero>.lua` at the bot root (see `ability_item_usage_antimage.lua`).
