@@ -17,16 +17,25 @@ local HeroRules = require("hero_rules")
 -- Max ability slots per hero.
 local MAX_SLOTS = 6
 
--- Score an enemy hero as a spell target: closer and lower HP is better.
+-- Score an enemy hero as a spell target: closer, lower HP, disabled, and
+-- not magic-immune is better. Magic-immune enemies are heavily deprioritized
+-- so the bot doesn't waste spells that can't affect them.
 local function ScoreTarget(bot, enemy)
+    if not Compat.IsValidHero(enemy) then return -1 end
+    if Compat.IsMagicImmune(enemy) then return -5000 end
     local pos = Compat.Position(bot)
     local epos = Compat.Position(enemy)
-    if not pos or not epos then return 0 end
+    if not pos or not epos then return -1 end
     local dx = epos.x - pos.x
     local dy = epos.y - pos.y
     local d = math.sqrt(dx * dx + dy * dy)
-    local hp = enemy:GetHealth() / math.max(1, enemy:GetMaxHealth())
-    return 3000 - d - hp * 1000
+    local hp = Compat.GetHP(enemy)
+    local score = 3000 - d - hp * 1000
+    -- Disabled enemies are easy to lock down; prioritize them.
+    if Compat.IsDisabled(enemy) then score = score + 500 end
+    -- Low-HP enemies are worth finishing.
+    if hp < 0.4 then score = score + 300 end
+    return score
 end
 
 -- Is this ability the hero's ultimate? IsUltimate() is on the ability handle.
@@ -280,11 +289,21 @@ function AbilityUsage:GetItemUsage(bot)
         end
     end
 
-    -- Unit-target items: cast on nearest visible enemy.
+    -- Unit-target items: cast on the nearest valid, affectable enemy.
+    -- Skip magic-immune targets so the item isn't wasted.
     for _, name in ipairs(UNIT_TARGET_ITEMS) do
         if Compat.HasItem(bot, name) then
             local it = Compat.ItemByName(bot, name)
-            if it then return it, enemies[1] end
+            if it then
+                local target = nil
+                for _, enemy in ipairs(enemies) do
+                    if Compat.IsValidHero(enemy) and not Compat.IsMagicImmune(enemy) then
+                        target = enemy
+                        break
+                    end
+                end
+                if target then return it, target end
+            end
         end
     end
 

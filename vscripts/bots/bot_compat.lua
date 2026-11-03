@@ -117,6 +117,89 @@ function Compat.Position(unit)
     return nil
 end
 
+-- Validity: unit exists and is not a null handle.
+function Compat.IsValid(unit)
+    if not unit then return false end
+    if unit.IsNull then
+        local ok, null = pcall(unit.IsNull, unit)
+        if ok and null then return false end
+    end
+    return true
+end
+
+-- Validity for hero targets: valid, alive, and actually a hero unit.
+function Compat.IsValidHero(unit)
+    if not Compat.IsValid(unit) then return false end
+    if unit:IsAlive and not unit:IsAlive() then return false end
+    if unit.GetUnitName then
+        local ok, name = pcall(unit.GetUnitName, unit)
+        if ok and name and type(name) == "string" and name:find("npc_dota_hero_") then
+            return true
+        end
+    end
+    -- Fallback: treat any valid alive unit as targetable if we can't confirm hero.
+    return true
+end
+
+-- Distance check between two units via their positions.
+function Compat.IsInRange(u1, u2, range)
+    if not u1 or not u2 then return false end
+    local p1, p2 = Compat.Position(u1), Compat.Position(u2)
+    if not p1 or not p2 then return false end
+    local dx = p2.x - p1.x
+    local dy = p2.y - p1.y
+    return math.sqrt(dx * dx + dy * dy) <= range
+end
+
+-- Health percentage 0..1.
+function Compat.GetHP(unit)
+    if not Compat.IsValid(unit) then return 0 end
+    if unit:GetHealth and unit:GetMaxHealth then
+        local ok, hp = pcall(unit.GetHealth, unit)
+        local ok2, max = pcall(unit.GetMaxHealth, unit)
+        if ok and ok2 and max and max > 0 then return hp / max end
+    end
+    return 0
+end
+
+-- Mana percentage 0..1.
+function Compat.GetMP(unit)
+    if not Compat.IsValid(unit) then return 0 end
+    if unit:GetMana and unit:GetMaxMana then
+        local ok, mp = pcall(unit.GetMana, unit)
+        local ok2, max = pcall(unit.GetMaxMana, unit)
+        if ok and ok2 and max and max > 0 then return mp / max end
+    end
+    return 0
+end
+
+-- Magic immune: most spells won't affect this unit.
+function Compat.IsMagicImmune(unit)
+    if not Compat.IsValid(unit) then return false end
+    if unit:IsMagicImmune then
+        local ok, immune = pcall(unit.IsMagicImmune, unit)
+        if ok then return immune and true or false end
+    end
+    return false
+end
+
+-- Disabled: stunned, rooted, or silenced (pcall-guarded; absent methods = not disabled).
+function Compat.IsDisabled(unit)
+    if not Compat.IsValid(unit) then return false end
+    for _, method in ipairs({ "IsStunned", "IsRooted", "IsSilenced" }) do
+        if unit[method] then
+            local ok, disabled = pcall(unit[method], unit)
+            if ok and disabled then return true end
+        end
+    end
+    return false
+end
+
+-- Bot is low on health and likely retreating.
+function Compat.IsRetreating(bot)
+    return Compat.GetHP(bot) < 0.35
+end
+
 -- Does the bot hold this item? Falls back to scanning the inventory.
 function Compat.HasItem(bot, name)
     if not bot or bot:IsNull() then return false end
