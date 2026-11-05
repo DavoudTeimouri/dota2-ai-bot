@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Open Hyper AI (OHA) - Quick Install Script for Linux
-# Creates a symbolic link from the Workshop download to the vscripts/bots folder.
+# AetherWeaver - Quick Install Script for Linux
+# Creates a symbolic link from the script folder to the vscripts/bots folder.
 # This lets the bot scripts load correctly in Custom Lobbies with Local Host.
 
 # Check if the script is run as root (needed for symlink in some setups)
@@ -54,8 +54,8 @@ if [ ! -d "$workshop_path" ]; then
   echo "Workshop folder not found at:"
   echo "  $workshop_path"
   echo ""
-  echo "Please subscribe to Open Hyper AI in the Steam Workshop first,"
-  echo "then wait for the download to complete before running this script."
+  echo "Please place the AetherWeaver bot scripts in the Dota 2 addon folder first,"
+  echo "then wait for the files to be in place before running this script."
   exit 1
 fi
 
@@ -89,7 +89,7 @@ if [ $? -eq 0 ]; then
   echo "============================================"
   echo ""
   echo "You can now create a Custom Lobby with"
-  echo "Local Host server to use OHA bot scripts."
+  echo "Local Host server to use AetherWeaver bot scripts."
 else
   echo ""
   echo "============================================"

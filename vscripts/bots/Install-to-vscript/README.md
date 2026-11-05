@@ -6,18 +6,18 @@ These scripts create a symbolic link from the Steam Workshop download folder to 
 
 | File                         | OS      | Language |
 | ---------------------------- | ------- | -------- |
-| `quick-install-oha.bat`      | Windows | English  |
-| `quick-install-oha-cn.bat`   | Windows | Chinese  |
-| `quick-install-oha-mac.sh`   | macOS   | English  |
-| `quick-install-oha-linux.sh` | Linux   | English  |
+| `quick-install-aetherweaver.bat`      | Windows | English  |
+| `quick-install-aetherweaver-cn.bat`   | Windows | Chinese  |
+| `quick-install-aetherweaver-mac.sh`   | macOS   | English  |
+| `quick-install-aetherweaver-linux.sh` | Linux   | English  |
 
 ---
 
 ## Usage — Windows
 
-1. In Dota 2, subscribe to **Open Hyper AI** in the Steam Workshop. Wait for the download to complete.
+1. Place the **vscripts/bots** folder from this repository into your Dota 2 addon folder.
 2. Navigate to folder: `Steam\steamapps\workshop\content\570\3246316298\Install-to-vscript`
-3. Double-click `quick-install-oha.bat` to install.
+3. Double-click `quick-install-aetherweaver.bat` to install.
 
 **Finding the folder:** Right-click Dota 2 in your Steam Library → Properties → Installed Files → Browse. This opens `Steam\steamapps\common\dota 2 beta`. In the address bar, replace `common\dota 2 beta` with `workshop\content\570\3246316298\Install-to-vscript` and press Enter.
 
@@ -25,7 +25,7 @@ These scripts create a symbolic link from the Steam Workshop download folder to 
 
 ## Usage — macOS
 
-1. Subscribe to **Open Hyper AI** in the Steam Workshop and wait for download.
+1. Place the **vscripts/bots** folder from this repository into your Dota 2 addon folder.
 2. Open Terminal.
 3. Navigate to the script folder:
     ```bash
@@ -33,15 +33,15 @@ These scripts create a symbolic link from the Steam Workshop download folder to 
     ```
 4. Make it executable and run:
     ```bash
-    chmod +x quick-install-oha-mac.sh
-    sudo ./quick-install-oha-mac.sh
+    chmod +x quick-install-aetherweaver-mac.sh
+    sudo ./quick-install-aetherweaver-mac.sh
     ```
 
 ---
 
 ## Usage — Linux
 
-1. Subscribe to **Open Hyper AI** in the Steam Workshop and wait for download.
+1. Place the **vscripts/bots** folder from this repository into your Dota 2 addon folder.
 2. Open a terminal.
 3. Navigate to the script folder (common Steam locations):
     ```bash
@@ -51,8 +51,8 @@ These scripts create a symbolic link from the Steam Workshop download folder to 
     ```
 4. Make it executable and run:
     ```bash
-    chmod +x quick-install-oha-linux.sh
-    sudo ./quick-install-oha-linux.sh
+    chmod +x quick-install-aetherweaver-linux.sh
+    sudo ./quick-install-aetherweaver-linux.sh
     ```
 
 The Linux script automatically checks multiple common Steam install locations (`~/.steam/steam`, `~/.local/share/Steam`, `~/.steam/debian-installation`).
@@ -61,7 +61,7 @@ The Linux script automatically checks multiple common Steam install locations (`
 
 ## How It Works
 
-The script creates a **symbolic link** from the Workshop folder to the Dota 2 vscripts directory:
+The script creates a **symbolic link** from this repository's `vscripts/bots` folder to the Dota 2 vscripts directory:
 
 ```
 Workshop:  Steam/steamapps/workshop/content/570/3246316298
@@ -69,11 +69,11 @@ Workshop:  Steam/steamapps/workshop/content/570/3246316298
 Target:    Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots
 ```
 
-Any Workshop updates to the script will automatically appear in the local dev folder.
+Any updates to this repository will automatically appear in the local dev folder.
 
 ## Why Is This Needed?
 
-Some players experience issues where bots fail to load correctly from the Workshop folder alone. Installing the scripts to the vscripts/bots folder via symlink resolves these issues while keeping auto-updates from Workshop.
+Some players experience issues where bots fail to load correctly. Installing the scripts to the vscripts/bots folder via symlink resolves these issues.
 
 ## Uninstall
 
@@ -104,8 +104,8 @@ This only removes the shortcut — your Workshop subscription and Dota 2 files a
 ## Troubleshooting
 
 -   **"Steam folder not found"**: Make sure Steam and Dota 2 are installed. If Steam is in a custom location, edit the script and set the path manually.
--   **"Workshop folder not found"**: Subscribe to Open Hyper AI in Workshop and wait for the download to complete before running the script.
+-   **"Workshop folder not found"**: Place the `vscripts/bots` folder from this repository into your Dota 2 addon folder before running the script.
 -   **Permission errors**: Run with administrator privileges (`Run as Administrator` on Windows, `sudo` on Mac/Linux).
 -   **Bots still not loading**: Create a Custom Lobby and select **Local Host** as the server location.
 
-For more detailed guides: https://github.com/forest0xia/dota2bot-OpenHyperAI/discussions
+For more detailed guides, check the issues in this repository.
