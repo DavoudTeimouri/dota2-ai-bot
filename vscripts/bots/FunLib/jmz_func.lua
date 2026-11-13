@@ -190,9 +190,9 @@ end
 
 --通用数量
 function J.GetNearbyAroundLocationUnitCount( bEnemy, bHero, nRadius, vLoc )
-	-- local cacheKey = 'GetNearbyAroundLocationUnitCount'..tostring(nRadius) ..'-'..tostring(bEnemy)..'-'..tostring(bHero)..'-'..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetNearbyAroundLocationUnitCount'..tostring(nRadius) ..'-'..tostring(bEnemy)..'-'..tostring(bHero)..'-'..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	local nCount = 0
 
@@ -225,7 +225,7 @@ function J.GetNearbyAroundLocationUnitCount( bEnemy, bHero, nRadius, vLoc )
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, nCount)
+	J.Utils.SetCachedVars(cacheKey, nCount)
 	return nCount
 
 end
@@ -292,9 +292,9 @@ end
 
 
 function J.GetAoeEnemyHeroLocation( bot, nCastRange, nRadius, nCount )
-	-- local cacheKey = 'GetAoeEnemyHeroLocation'..tostring(bot:GetPlayerID())..'-'..tostring(nCastRange) --..'-'..tostring(nRadius)..'-'..tostring(nCount)
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.2)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetAoeEnemyHeroLocation'..tostring(bot:GetPlayerID())..'-'..tostring(nCastRange) --..'-'..tostring(nRadius)..'-'..tostring(nCount)
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.2)
+	if cache ~= nil then return cache end
 
 	local nAoe = bot:FindAoELocation( true, true, bot:GetLocation(), nCastRange, nRadius, 0, 0 )
 
@@ -313,12 +313,12 @@ function J.GetAoeEnemyHeroLocation( bot, nCastRange, nRadius, nCount )
 
 		if nTrueCount >= nCount
 		then
-			-- J.Utils.SetCachedVars(cacheKey, nAoe.targetloc)
+		J.Utils.SetCachedVars(cacheKey, nAoe.targetloc)
 			return nAoe.targetloc
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, nil)
+	J.Utils.SetCachedVars(cacheKey, nil)
 	return nil
 
 end
@@ -359,13 +359,13 @@ end
 
 
 function J.IsAllyCanKill( target )
-	-- local cacheKey = 'IsAllyCanKill'..tostring(target:GetPlayerID())
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'IsAllyCanKill'..tostring(target:GetPlayerID())
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	if target:GetHealth() / target:GetMaxHealth() > 0.38
 	then
-		-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 		return false
 	end
 
@@ -387,11 +387,11 @@ function J.IsAllyCanKill( target )
 
 	if J.CanKillTarget( target, nTotalDamage, nDamageType )
 	then
-		-- J.Utils.SetCachedVars(cacheKey, true)
+	J.Utils.SetCachedVars(cacheKey, true)
 		return true
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 	return false
 
 end
@@ -403,13 +403,13 @@ function J.IsOtherAllyCanKillTarget( bot, target )
 	-- if cache ~= nil then return cache end
 
 	if not J.IsValid(target) then
-		-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 		return false
 	end
 
 	if target:GetHealth() / target:GetMaxHealth() > 0.38
 	then
-		-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 		return false
 	end
 
@@ -438,11 +438,11 @@ function J.IsOtherAllyCanKillTarget( bot, target )
 
 	if nTotalDamage > target:GetHealth()
 	then
-		-- J.Utils.SetCachedVars(cacheKey, true)
+	J.Utils.SetCachedVars(cacheKey, true)
 		return true
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 	return false
 end
 
@@ -465,7 +465,7 @@ function J.GetRetreatingAlliesNearLoc( vLoc, nRadius )
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, allies)
+	J.Utils.SetCachedVars(cacheKey, allies)
 
 	return allies
 
@@ -473,9 +473,9 @@ end
 
 function J.GetAlliesNearLoc( vLoc, nRadius )
 	local allies = {}
-	-- local cacheKey = 'GetAlliesNearLoc'..tostring(nRadius) ..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetAlliesNearLoc'..tostring(nRadius) ..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	for i = 1, #GetTeamPlayers( GetTeam() )
 	do
@@ -488,16 +488,16 @@ function J.GetAlliesNearLoc( vLoc, nRadius )
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, allies)
+	J.Utils.SetCachedVars(cacheKey, allies)
 
 	return allies
 
 end
 
 function J.GetEnemiesNearLoc(vLoc, nRadius)
-	-- local cacheKey = 'GetEnemiesNearLoc'..tostring(nRadius) ..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetEnemiesNearLoc'..tostring(nRadius) ..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	local enemies = {}
 	for _, enemyHero in pairs(GetUnitList(UNIT_LIST_ENEMY_HEROES))
@@ -512,7 +512,7 @@ function J.GetEnemiesNearLoc(vLoc, nRadius)
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, enemies)
+	J.Utils.SetCachedVars(cacheKey, enemies)
 
 	return enemies
 end
@@ -532,7 +532,7 @@ function J.GetAnyEnemiesNearLoc(vLoc, nRadius)
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, enemies)
+	J.Utils.SetCachedVars(cacheKey, enemies)
 
 	return enemies
 end
@@ -735,35 +735,35 @@ end
 
 
 function J.IsNoItemIllution(bot)
-	-- local cacheKey = 'IsNoItemIllution'
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'IsNoItemIllution'
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	if (bot:IsIllusion() or J.IsMeepoClone(bot))
 	and not bot:HasModifier("modifier_arc_warden_tempest_double")
 	and bot:GetUnitName() ~= 'npc_dota_hero_vengefulspirit'
 	then
-		-- J.Utils.SetCachedVars(cacheKey, true)
+	J.Utils.SetCachedVars(cacheKey, true)
 		return true
 	end
-	-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 	return false
 end
 
 function J.IsNoAbilityIllution(bot)
-	-- local cacheKey = 'IsNoAbilityIllution'
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'IsNoAbilityIllution'
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	if bot:IsIllusion()
 	and not bot:HasModifier("modifier_arc_warden_tempest_double")
 	and bot:GetUnitName() ~= 'npc_dota_hero_vengefulspirit'
 	and not J.IsMeepoClone(bot)
 	then
-		-- J.Utils.SetCachedVars(cacheKey, true)
+	J.Utils.SetCachedVars(cacheKey, true)
 		return true
 	end
-	-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 	return false
 end
 
@@ -3221,8 +3221,9 @@ function J.GetTeamFightLocation( bot )
 
 	local team = GetTeam()
 
-	-- local res = J.Utils.GetCachedVars('GetTeamFightLocation'..tostring(team), 0.5)
-	-- if res ~= nil then return res end
+	local cacheKey = 'GetTeamFightLocation'..tostring(team)
+	local res = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if res ~= nil then return res end
 
 	local targetLocation = nil
 	local numPlayer = GetTeamPlayers( team )
@@ -3240,7 +3241,7 @@ function J.GetTeamFightLocation( bot )
 		end
 	end
 
-	-- J.Utils.SetCachedVars('GetTeamFightLocation', targetLocation)
+	J.Utils.SetCachedVars('GetTeamFightLocation', targetLocation)
 	return targetLocation
 
 end
@@ -3869,9 +3870,9 @@ function J.IsHaveAegis( bot )
 end
 
 function J.DoesTeamHaveAegis()
-	-- local cacheKey = tostring(GetTeam())
-	-- local res = J.Utils.GetCachedVars('DoesTeamHaveAegis'..cacheKey, 1)
-	-- if res ~= nil then return res end
+	local cacheKey = tostring(GetTeam())
+	local res = J.Utils.GetCachedVars('DoesTeamHaveAegis'..cacheKey, 1)
+	if res ~= nil then return res end
 
 	local numPlayer = GetTeamPlayers( GetTeam() )
 	for i = 1, #numPlayer
@@ -3880,20 +3881,20 @@ function J.DoesTeamHaveAegis()
 		if J.IsValidHero(member)
 		and J.IsHaveAegis(member)
 		then
-			-- J.Utils.SetCachedVars('DoesTeamHaveAegis'..cacheKey, true)
+			J.Utils.SetCachedVars('DoesTeamHaveAegis'..cacheKey, true)
 			return true
 		end
 	end
 
-	-- J.Utils.SetCachedVars('DoesTeamHaveAegis'..cacheKey, false)
+	J.Utils.SetCachedVars('DoesTeamHaveAegis'..cacheKey, false)
 	return false
 end
 
 
 function J.GetCoresAverageNetworth()
-	-- local cacheKey = 'GetCoresAverageNetworth'..tostring(GetTeam())
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 2)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetCoresAverageNetworth'..tostring(GetTeam())
+	local cache = J.Utils.GetCachedVars(cacheKey, 2)
+	if cache ~= nil then return cache end
 
 	local totalNetWorth = 0
 	local coreCount = 0
@@ -3909,13 +3910,13 @@ function J.GetCoresAverageNetworth()
 	end
 
 	local res = totalNetWorth / coreCount
-	-- J.Utils.SetCachedVars(cacheKey, res)
+	J.Utils.SetCachedVars(cacheKey, res)
 	return res
 end
 
 function J.GetCoresMaxNetworth()
 	local cacheKey = 'GetCoresMaxNetworth'..tostring(GetTeam())
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 2)
+	local cache = J.Utils.GetCachedVars(cacheKey, 2)
 	if cache ~= nil then return cache end
 
 	local maxNetWorth = 0
@@ -3932,7 +3933,7 @@ function J.GetCoresMaxNetworth()
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, maxNetWorth)
+	J.Utils.SetCachedVars(cacheKey, maxNetWorth)
 	return maxNetWorth
 end
 
@@ -4149,9 +4150,9 @@ end
 
 
 function J.IsEnemyHeroAroundLocation( vLoc, nRadius )
-	-- local cacheKey = 'IsEnemyHeroAroundLocation'..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))..'-'..tostring(nRadius)
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'IsEnemyHeroAroundLocation'..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))..'-'..tostring(nRadius)
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	for i, id in pairs( GetTeamPlayers( GetOpposingTeam() ) )
 	do
@@ -4163,22 +4164,22 @@ function J.IsEnemyHeroAroundLocation( vLoc, nRadius )
 					and J.GetLocationToLocationDistance( vLoc, dInfo.location ) <= nRadius
 					and dInfo.time_since_seen < 2.0
 				then
-					-- J.Utils.SetCachedVars(cacheKey, true)
+				J.Utils.SetCachedVars(cacheKey, true)
 					return true
 				end
 			end
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 	return false
 
 end
 
 function J.GetLastSeenEnemiesNearLoc(vLoc, nRadius)
-	-- local cacheKey = 'GetLastSeenEnemiesNearLoc'..tostring(nRadius) ..'-'..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetLastSeenEnemiesNearLoc'..tostring(nRadius) ..'-'..tostring(J.ToNearest500(vLoc.x))..'-'..tostring(J.ToNearest500(vLoc.y))
+	local cache = J.Utils.GetCachedVars(cacheKey, 0.5)
+	if cache ~= nil then return cache end
 
 	local enemies = {}
 
@@ -4198,7 +4199,7 @@ function J.GetLastSeenEnemiesNearLoc(vLoc, nRadius)
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, enemies)
+	J.Utils.SetCachedVars(cacheKey, enemies)
 	return enemies
 end
 
@@ -4207,9 +4208,9 @@ function J.GetNumOfAliveHeroes( bEnemy )
 	local nTeam = GetTeam()
 	if bEnemy then nTeam = GetOpposingTeam() end
 
-	-- local cacheKey = 'GetNumOfAliveHeroes'..tostring(nTeam)
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 1)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetNumOfAliveHeroes'..tostring(nTeam)
+	local cache = J.Utils.GetCachedVars(cacheKey, 1)
+	if cache ~= nil then return cache end
 
 	for i, id in pairs( GetTeamPlayers( nTeam ) )
 	do
@@ -4219,7 +4220,7 @@ function J.GetNumOfAliveHeroes( bEnemy )
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, count)
+	J.Utils.SetCachedVars(cacheKey, count)
 	return count
 
 end
@@ -4255,9 +4256,9 @@ function J.GetAverageLevel( bEnemy )
 	local nTeam = GetTeam()
 	if bEnemy then nTeam = GetOpposingTeam() end
 
-	-- local cacheKey = 'GetAverageLevel'..tostring(nTeam)
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 1)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetAverageLevel'..tostring(nTeam)
+	local cache = J.Utils.GetCachedVars(cacheKey, 1)
+	if cache ~= nil then return cache end
 
 	for i, id in pairs( GetTeamPlayers( nTeam ) )
 	do
@@ -4267,7 +4268,7 @@ function J.GetAverageLevel( bEnemy )
 
 	local res = sum / count
 
-	-- J.Utils.SetCachedVars(cacheKey, res)
+	J.Utils.SetCachedVars(cacheKey, res)
 	return res
 
 end
@@ -4278,16 +4279,16 @@ function J.GetNumOfTeamTotalKills( bEnemy )
 	local nTeam = GetOpposingTeam()
 	if bEnemy then nTeam = GetTeam() end
 
-	-- local cacheKey = 'GetNumOfTeamTotalKills'..tostring(nTeam)
-	-- local cache = J.Utils.GetCachedVars(cacheKey, 1)
-	-- if cache ~= nil then return cache end
+	local cacheKey = 'GetNumOfTeamTotalKills'..tostring(nTeam)
+	local cache = J.Utils.GetCachedVars(cacheKey, 1)
+	if cache ~= nil then return cache end
 
 	for i, id in pairs( GetTeamPlayers( nTeam ) )
 	do
 		count = count + GetHeroDeaths( id )
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, count)
+	J.Utils.SetCachedVars(cacheKey, count)
 	return count
 
 end
@@ -5494,11 +5495,11 @@ function J.HasEnemyIceSpireNearby(bot, nRange)
         if J.IsValid(enemy)
 		and enemy:GetUnitName() == "npc_dota_lich_ice_spire"
 		and J.IsInRange(bot, enemy, nRange) then
-			-- J.Utils.SetCachedVars(cacheKey, true)
+		J.Utils.SetCachedVars(cacheKey, true)
 			return enemy
 		end
 	end
-	-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 	return false
 end
 
@@ -5514,11 +5515,11 @@ function J.AnyAllyAffectedByChainFrost(bot, nRange)
         and J.IsInRange(bot, ally, nRange)
 		and ally ~= bot
         and ally:HasModifier('modifier_lich_chainfrost_slow') then
-			-- J.Utils.SetCachedVars(cacheKey, true)
+		J.Utils.SetCachedVars(cacheKey, true)
             return true
         end
     end
-	-- J.Utils.SetCachedVars(cacheKey, false)
+	J.Utils.SetCachedVars(cacheKey, false)
 	return false
 end
 
@@ -6156,7 +6157,7 @@ function J.GetAliveCoreCount(nEnemy)
 		end
 	end
 
-	-- J.Utils.SetCachedVars(cacheKey, count)
+	J.Utils.SetCachedVars(cacheKey, count)
 	return count
 end
 
