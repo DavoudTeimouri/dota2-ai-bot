@@ -705,9 +705,8 @@ local function PickHeroForBotSlot(i, id)
 
 	-- Update per-team weak count if needed
 	if Utils.HasValue(WeakHeroes, pick) then
-		-- Refresh live count (defensive) and then increment by pick
-		WeakHeroCount[team] = CountWeakHeroesSelectedOnTeam(team)
-		WeakHeroCount[team] = WeakHeroCount[team] + 1
+				-- Engine already counts this pick; trust it instead of double-adding.
+				WeakHeroCount[team] = CountWeakHeroesSelectedOnTeam(team)
 	end
 
 	return pick
@@ -967,7 +966,7 @@ function GetHumanChatHero(name)
 	if name == nil then return ""; end
 	name = name:lower()
 	for _, hero in pairs(SupportedHeroes) do
-		if heroUnitNames['en'][hero]:lower() == name then
+			if heroUnitNames['en'][hero] and heroUnitNames['en'][hero]:lower() == name then
 			print('Found hero ' .. hero .. ' for '..name)
 			return hero;
 		end

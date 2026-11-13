@@ -1,7 +1,8 @@
 local X = {}
 local bot = GetBot()
+if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or bot:IsIllusion() then return end
 local botName = bot:GetUnitName()
-if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not string.find(botName, "hero") or bot:IsIllusion() then return end
+if not string.find(botName, "hero") then return end
 if not bot.frameProcessTime then bot.frameProcessTime = 0.1 end
 
 local team = GetTeam()

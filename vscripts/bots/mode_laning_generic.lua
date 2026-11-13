@@ -207,8 +207,13 @@ if local_mode_laning_generic or (J.GetPosition(bot) == 1 and J.IsPosxHuman(5)) t
 		local nLongestAttackRange = math.max(botAttackRange, 250, nFurthestEnemyAttackRange)
 
 		local target_loc = GetLaneFrontLocation(GetTeam(), botAssignedLane, -nLongestAttackRange)
+		if not target_loc then
+			return
+		end
+
 		if fLaneFrontAmount_enemy < fLaneFrontAmount then
-			target_loc = GetLaneFrontLocation(GetOpposingTeam(), botAssignedLane, -nLongestAttackRange)
+			local enemyLoc = GetLaneFrontLocation(GetOpposingTeam(), botAssignedLane, -nLongestAttackRange)
+			if enemyLoc then target_loc = enemyLoc end
 		end
 
 		bot:Action_MoveToLocation(target_loc + RandomVector(50))
