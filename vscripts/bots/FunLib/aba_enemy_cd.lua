@@ -179,12 +179,31 @@ function X.GetPlayerUltCDs(playerID)
     return EnemyUltCD[playerID] or {}
 end
 
--- Get the ultimate ability name for a hero unit
+-- Get the ultimate ability handle for a hero unit
+function X.GetUltAbility(unit)
+    if not unit or unit:IsNull() then return nil end
+    for i = 0, 23 do
+        local ab = unit:GetAbilityInSlot(i)
+        if ab and not ab:IsNull() and ab:IsUltimate() and ab:GetLevel() > 0 then
+            return ab
+        end
+    end
+    return nil
+end
+
+-- Get the ultimate ability name for a hero unit (best-effort)
 function X.GetUltName(unit)
-    local name = unit:GetUnitName()
-    if name == nil then return nil end
-    local s = string.gsub(name, "^npc_dota_hero_", "")
-    return s .. "_spectre" -- fallback, will be overridden below
+    local ab = X.GetUltAbility(unit)
+    if ab and ab.GetName then
+        local ok, name = pcall(ab.GetName, ab)
+        if ok and name then return name end
+    end
+    local unitName = unit:GetUnitName()
+    if unitName then
+        local s = string.gsub(unitName, "^npc_dota_hero_", "")
+        return s .. "_ability" -- fallback pattern
+    end
+    return nil
 end
 
 -- Clear all tracking (call on new game)

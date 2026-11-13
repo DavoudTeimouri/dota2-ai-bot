@@ -10,7 +10,8 @@ local bDebugMode = ( 10 == 10 )
 
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func' )
 local Utils = require( GetScriptDirectory()..'/FunLib/utils' )
-local BotBuild = dofile( GetScriptDirectory().."/BotLib/"..string.gsub( botName, "npc_dota_", "" ) )
+local EnemyCD = require( GetScriptDirectory()..'/FunLib/aba_enemy_cd' )
+local BotBuild = dofile( GetScriptDirectory().."/BotLib/.."..string.gsub( botName, "npc_dota_hero_", "" ) )
 local Localization = require( GetScriptDirectory()..'/FunLib/localization' )
 local Customize = require(GetScriptDirectory()..'/Customize/general')
 Customize.ThinkLess = Customize.Enable and Customize.ThinkLess or 1
@@ -8384,12 +8385,38 @@ function ItemUsageThink()
 end
 
 function AbilityUsageThink()
-	if RefreshBotHandle() then return end
-	if bot:IsInvulnerable() or not bot:IsHero() or not bot:IsAlive() or not string.find(botName, "hero") or bot:IsIllusion() then return end
-	if bot.lastAbilityFrameProcessTime == nil then bot.lastAbilityFrameProcessTime = DotaTime() end
-	if DotaTime() > 30 and (DotaTime() - bot.lastAbilityFrameProcessTime < (bot.frameProcessTime * (1 + Customize.ThinkLess))) and bot.isBear == nil then return end
-	bot.lastAbilityFrameProcessTime = DotaTime()
-	if BotBuild ~= nil and not J.IsNoAbilityIllution(bot) then BotBuild.SkillsComplement() end
+    if RefreshBotHandle() then return end
+    if bot:IsInvulnerable() or not bot:IsHero() or not bot:IsAlive() or not string.find(botName, "hero") or bot:IsIllusion() then return end
+    if bot.lastAbilityFrameProcessTime == nil then bot.lastAbilityFrameProcessTime = DotaTime() end
+    if DotaTime() > 30 and (DotaTime() - bot.lastAbilityFrameProcessTime < (bot.frameProcessTime * (1 + Customize.ThinkLess))) and bot.isBear == nil then return end
+    bot.lastAbilityFrameProcessTime = DotaTime()
+
+    -- Track enemy ultimate cooldowns by scanning enemy heroes' abilities
+    local enemies = J.GetNearbyHeroes(bot, 2500, true, BOT_MODE_NONE)
+    if enemies then
+        for _, enemy in ipairs(enemies) do
+            if J.IsValidHero(enemy) then
+                local pid = enemy:GetPlayerID()
+                if pid ~= nil then
+                    for i = 0, 23 do
+                        local ab = enemy:GetAbilityInSlot(i)
+                        if ab and not ab:IsNull() and ab:IsUltimate() and ab:GetLevel() > 0 then
+                            if not ab:IsFullyCastable() then
+                                local rem = ab:GetCooldownTimeRemaining()
+                                if rem > 0 and rem < 120 then
+                                    local abName = ab:GetName and ab:GetName() or "unknown"
+                                    EnemyCD.NotifyUltCast(pid, abName, DotaTime() - rem)
+                                end
+                            end
+                            break -- one ult per hero
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if BotBuild ~= nil and not J.IsNoAbilityIllution(bot) then BotBuild.SkillsComplement() end
 end
 
 function BuybackUsageThink()
