@@ -144,6 +144,76 @@ function GetDesireHelper()
         return BOT_MODE_DESIRE_NONE
     end
 
+    -- Hero-specific retreat overrides: don't retreat if key survival ability is ready
+    local botName = bot:GetUnitName()
+    local botLevel = bot:GetLevel()
+    
+    -- Puck: Phase Shift ready
+    if botName == 'npc_dota_hero_puck' then
+        local phaseShift = bot:GetAbilityByName('puck_phase_shift')
+        if phaseShift and phaseShift:IsFullyCastable() and phaseShift:GetLevel() > 0 then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+    
+    -- Slark: Shadow Dance ready
+    if botName == 'npc_dota_hero_slark' then
+        local shadowDance = bot:GetAbilityByName('slark_shadow_dance')
+        if shadowDance and shadowDance:IsFullyCastable() and shadowDance:GetLevel() > 0 then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+    
+    -- Anti-Mage: Blink ready
+    if botName == 'npc_dota_hero_antimage' then
+        local blink = bot:GetAbilityByName('antimage_blink')
+        if blink and blink:IsFullyCastable() and blink:GetLevel() > 0 then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+    
+    -- Queen of Pain: Blink ready
+    if botName == 'npc_dota_hero_queenofpain' then
+        local blink = bot:GetAbilityByName('queenofpain_blink')
+        if blink and blink:IsFullyCastable() and blink:GetLevel() > 0 then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+    
+    -- Ember Spirit: Sleight of Fist or Fire Remnant ready
+    if botName == 'npc_dota_hero_ember_spirit' then
+        local sleight = bot:GetAbilityByName('ember_spirit_sleight_of_fist')
+        local remnant = bot:GetAbilityByName('ember_spirit_fire_remnant')
+        if (sleight and sleight:IsFullyCastable() and sleight:GetLevel() > 0)
+           or (remnant and remnant:IsFullyCastable() and remnant:GetLevel() > 0) then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+    
+    -- Morphling: Waveform ready
+    if botName == 'npc_dota_hero_morphling' then
+        local waveform = bot:GetAbilityByName('morphling_waveform')
+        if waveform and waveform:IsFullyCastable() and waveform:GetLevel() > 0 then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+    
+    -- Weaver: Shukuchi ready
+    if botName == 'npc_dota_hero_weaver' then
+        local shukuchi = bot:GetAbilityByName('weaver_shukuchi')
+        if shukuchi and shukuchi:IsFullyCastable() and shukuchi:GetLevel() > 0 then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+    
+    -- Storm Spirit: Ball Lightning ready
+    if botName == 'npc_dota_hero_storm_spirit' then
+        local ballLightning = bot:GetAbilityByName('storm_spirit_ball_lightning')
+        if ballLightning and ballLightning:IsFullyCastable() and ballLightning:GetLevel() > 0 then
+            return BOT_MODE_DESIRE_NONE
+        end
+    end
+
     -- cache bot state
     botHP          = J.GetHP(bot)
     botMP          = J.GetMP(bot)

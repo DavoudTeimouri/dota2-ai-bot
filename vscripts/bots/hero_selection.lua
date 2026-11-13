@@ -890,10 +890,28 @@ local function handleCommand(inputStr, PlayerID, bTeamOnly)
 					end
 				end
 			else
-				print("Cannot select pos: " .. y..' (not available).')
+			    print("Cannot select pos: " .. y..' (not available).')
 			end
 
-		elseif subKey == "!sp" or subKey == "!speak" then
+			-- Team coordination commands
+			elseif subKey == "!ward" then
+			    print("Ward request: placing wards at priority spots")
+			    X.WardRequest = true
+			    X.WardRequestTime = DotaTime()
+			elseif subKey == "!rosh" then
+			    print("Roshan request: moving to pit")
+			    X.RoshanRequest = true
+			    X.RoshanRequestTime = DotaTime()
+			elseif subKey == "!smoke" then
+			    print("Smoke request: grouping for gank")
+			    X.SmokeRequest = true
+			    X.SmokeRequestTime = DotaTime()
+			elseif subKey == "!stack" then
+			    print("Stack request: stacking neutral camps")
+			    X.CampStackRequest = true
+			    X.CampStackRequestTime = DotaTime()
+
+			elseif subKey == "!sp" or subKey == "!speak" then
 			HandleLocaleSetting(subVal)
 		else
 			print("Unknown action: " .. subKey .. ', command text: '..tostring(inputStr))
