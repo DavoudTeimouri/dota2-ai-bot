@@ -4,6 +4,7 @@ if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not bot:IsAlive() o
 
 local Utils = require(GetScriptDirectory()..'/FunLib/utils')
 local EnemyRoles = require(GetScriptDirectory()..'/FunLib/enemy_role_estimation')
+local EnemyCD = require(GetScriptDirectory()..'/FunLib/aba_enemy_cd')
 local Localization = require(GetScriptDirectory()..'/FunLib/localization')
 local Customize = require(GetScriptDirectory()..'/Customize/general')
 Customize.ThinkLess = Customize.Enable and Customize.ThinkLess or 1
@@ -118,7 +119,41 @@ function GetDesireHelper()
     nearbyAllies = J.GetAlliesNearLoc(bot:GetLocation(), 2200)
     nearbyEnemies = J.GetEnemiesNearLoc(bot:GetLocation(), 2000)
 
+    -- Enemy cooldown tracking: if enemy ultimates are down, we're more aggressive;
+    -- if they're ready, we're more cautious.
+    local nEnemyUltDown = 0
+    local nEnemyUltReady = 0
+    for _, enemy in ipairs(nearbyEnemies) do
+        if J.IsValidHero(enemy) then
+            -- Scan enemy abilities for their ultimate
+            for i = 0, 23 do
+                local ab = enemy:GetAbilityInSlot(i)
+                if ab and not ab:IsNull() and ab:IsUltimate() and ab:GetLevel() > 0 then
+                    if ab:IsFullyCastable() then
+                        nEnemyUltReady = nEnemyUltReady + 1
+                    else
+                        local rem = ab:GetCooldownTimeRemaining()
+                        if rem > 0 and rem < 120 then
+                            nEnemyUltDown = nEnemyUltDown + 1
+                        end
+                    end
+                    break -- one ult per hero
+                end
+            end
+        end
+    end
+
     target, ShouldHelpAlly = ConsiderHelpAlly()
+
+    -- Enemy cooldown adjustment: if enemy ultimates are down, engage more;
+    -- if they're ready, engage less.
+    local nUltAdjust = 0.0
+    if nEnemyUltDown > nEnemyUltReady then
+        nUltAdjust = 0.15 * nEnemyUltDown  -- boost desire when enemy ults are down
+    elseif nEnemyUltReady > 0 then
+        nUltAdjust = -0.10 * nEnemyUltReady  -- reduce desire when enemy ults are ready
+    end
+
     if ShouldHelpAlly then
         SetStickyTarget(target)
         targetUnit = target
@@ -166,7 +201,7 @@ function GetDesireHelper()
             if botTarget ~= nil then
                 targetUnit = botTarget
                 bot:SetTarget(botTarget)
-                return RemapValClamped(J.GetHP(bot), 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire)
+                return RemapValClamped(J.GetHP(bot), 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire + nUltAdjust)
             end
         end
         if IsSupport then
@@ -174,7 +209,7 @@ function GetDesireHelper()
             if botTarget ~= nil then
                 targetUnit = botTarget
                 bot:SetTarget(botTarget)
-                return RemapValClamped(J.GetHP(bot), 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire)
+                return RemapValClamped(J.GetHP(bot), 0, 0.4, BOT_MODE_DESIRE_NONE, targetDesire + nUltAdjust)
             end
         end
 

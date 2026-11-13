@@ -214,6 +214,34 @@ function GetDesireHelper()
         end
     end
 
+    -- Enemy cooldown tracking: if enemy ultimates are down, we're less likely to retreat
+    local nearbyEnemies = J.GetEnemiesNearLoc(bot:GetLocation(), 1600)
+    local nEnemyUltDown = 0
+    local nEnemyUltReady = 0
+    for _, enemy in ipairs(nearbyEnemies) do
+        if J.IsValidHero(enemy) then
+            for i = 0, 23 do
+                local ab = enemy:GetAbilityInSlot(i)
+                if ab and not ab:IsNull() and ab:IsUltimate() and ab:GetLevel() > 0 then
+                    if ab:IsFullyCastable() then
+                        nEnemyUltReady = nEnemyUltReady + 1
+                    else
+                        local rem = ab:GetCooldownTimeRemaining()
+                        if rem > 0 and rem < 120 then
+                            nEnemyUltDown = nEnemyUltDown + 1
+                        end
+                    end
+                    break
+                end
+            end
+        end
+    end
+
+    -- If enemy ultimates are down and ours are ready, reduce retreat desire
+    if nEnemyUltDown > nEnemyUltReady and J.GetHP(bot) > 0.25 then
+        return BOT_MODE_DESIRE_NONE
+    end
+
     -- cache bot state
     botHP          = J.GetHP(bot)
     botMP          = J.GetMP(bot)
