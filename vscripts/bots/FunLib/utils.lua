@@ -1072,7 +1072,16 @@ function ____exports.GetCachedVars(key, withinTime)
     return nil
 end
 function ____exports.CleanupCachedVars()
-    return
+    local now = DotaTime()
+    for k, v in pairs(____exports.GameStates.cachedVars) do
+        if type(k) == "string" and k:match("-Time$") then
+            local baseKey = k:sub(1, -6)
+            if now - v > 300 then
+                ____exports.GameStates.cachedVars[k] = nil
+                ____exports.GameStates.cachedVars[baseKey] = nil
+            end
+        end
+    end
 end
 function ____exports.CountEnemyHeroesNear(loc, r)
     local n = 0

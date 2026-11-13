@@ -455,10 +455,9 @@ function ItemPurchaseThink()
 			BotBuild = newBuild
 			sPurchaseList = newBuild['sBuyList']
 			sItemSellList = newBuild['sSellList']
-		else
-			sPurchaseList = {}
-			sItemSellList = {}
-		end
+				else
+					print("[ARDM] Failed to load item build for " .. heroFile .. "; keeping previous build")
+				end
 
 		-- Rebuild purchase list, skipping owned items, duplicate boots, early items
 		local bHasBoots = Item.HasBuyBoots(bot)

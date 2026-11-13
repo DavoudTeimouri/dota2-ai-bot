@@ -855,6 +855,11 @@ local function handleCommand(inputStr, PlayerID, bTeamOnly)
 
 		elseif subKey:match("^!(%d+)pos$") ~= nil and GetGameState() == GAME_STATE_PRE_GAME then
 			local x, y = inputStr:match("^!(%d+)pos (%d+)$")
+			local xi = tonumber(x)
+			if not xi or xi < 1 or xi > 5 then
+				print("Invalid bot index: " .. tostring(x))
+				return
+			end
 			if x and y then
 				print("Swap position for #" .. x .. " to play pos " .. y)
 			else
@@ -966,13 +971,13 @@ function GetHumanChatHero(name)
 	if name == nil then return ""; end
 	name = name:lower()
 	for _, hero in pairs(SupportedHeroes) do
-			if heroUnitNames['en'][hero] and heroUnitNames['en'][hero]:lower() == name then
+		if heroUnitNames['en'][hero] and heroUnitNames['en'][hero]:lower() == name then
 			print('Found hero ' .. hero .. ' for '..name)
 			return hero;
 		end
 	end
 	for _, hero in pairs(SupportedHeroes) do
-		if string.find(hero, name) then
+		if string.find(hero, name, 1, true) then
 			print('Found hero ' .. hero .. ' for '..name)
 			return hero;
 		end
