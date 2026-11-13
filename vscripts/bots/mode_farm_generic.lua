@@ -55,11 +55,11 @@ local runMode = false;
 if bot.farmLocation == nil then bot.farmLocation = bot:GetLocation() end
 
 function GetDesire()
-	-- local cacheKey = 'GetFarmDesire'..tostring(bot:GetPlayerID())
-	-- local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.4)
-	-- if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
+	local cacheKey = 'GetFarmDesire'..tostring(bot:GetPlayerID())
+	local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.4)
+	if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
 	local res = GetDesireHelper()
-	-- J.Utils.SetCachedVars(cacheKey, res)
+	J.Utils.SetCachedVars(cacheKey, res)
 	return res
 end
 

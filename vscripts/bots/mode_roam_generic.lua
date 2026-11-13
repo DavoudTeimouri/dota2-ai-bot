@@ -6,7 +6,6 @@ local botName = bot:GetUnitName()
 
 if bot == nil or bot:IsInvulnerable() or not bot:IsHero() or not bot:IsAlive() or not string.find(botName, "hero") or bot:IsIllusion() then return end
 
-local cAbility = nil
 local TinkerShouldWaitInBaseToHeal = false
 
 local ShouldWaitInBaseToHeal = false
@@ -49,11 +48,11 @@ local laneAndT1s = {
 }
 
 function GetDesire()
-	-- local cacheKey = 'GetRoamDesire'..tostring(bot:GetPlayerID())
-	-- local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.5 * (1 + Customize.ThinkLess))
-	-- if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
+	local cacheKey = 'GetRoamDesire'..tostring(bot:GetPlayerID())
+	local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.5 * (1 + Customize.ThinkLess))
+	if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
 	local res = GetDesireHelper()
-	-- J.Utils.SetCachedVars(cacheKey, res)
+	J.Utils.SetCachedVars(cacheKey, res)
 	return res
 end
 function GetDesireHelper()

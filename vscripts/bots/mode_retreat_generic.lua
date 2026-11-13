@@ -42,9 +42,9 @@ local function scanDroppedForAegis(radius)
 end
 
 local function buildContext()
-	-- local cacheKey = 'buildContext'..tostring(bot:GetPlayerID())
-	-- local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.35 * (1 + Customize.ThinkLess))
-	-- if cachedVar ~= nil then return cachedVar end
+	local cacheKey = 'buildContext'..tostring(bot:GetPlayerID())
+	local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.35 * (1 + Customize.ThinkLess))
+	if cachedVar ~= nil then return cachedVar end
 
     -- reset
     C.allyHeroes, C.enemyHeroes = {}, {}
@@ -118,11 +118,11 @@ end
 -- === existing functions, now reusing context ===
 
 function GetDesire()
-    -- local cacheKey = 'GetRetreatDesire'..tostring(bot:GetPlayerID())
-    -- local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.35 * (1 + Customize.ThinkLess))
-    -- if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
+	local cacheKey = 'GetRetreatDesire'..tostring(bot:GetPlayerID())
+	local cachedVar = J.Utils.GetCachedVars(cacheKey, 0.35 * (1 + Customize.ThinkLess))
+	if DotaTime() > 30 and cachedVar ~= nil then return cachedVar end
     local res = GetDesireHelper()
-    -- J.Utils.SetCachedVars(cacheKey, res)
+    J.Utils.SetCachedVars(cacheKey, res)
     return res
 end
 
