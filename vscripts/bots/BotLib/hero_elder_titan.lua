@@ -127,8 +127,8 @@ nAbilityBuildList, nTalentBuildList, X['sBuyList'], X['sSellList'] = J.SetUserHe
 
 X['sSkillList'] = J.Skill.GetSkillList( sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList )
 
-X['bDeafaultAbility'] = false
-X['bDeafaultItem'] = false
+X['bDefaultAbility'] = false
+X['bDefaultItem'] = false
 
 local EchoStomp             = bot:GetAbilityByName('elder_titan_echo_stomp')
 local AstralSpirit          = bot:GetAbilityByName('elder_titan_ancestral_spirit')

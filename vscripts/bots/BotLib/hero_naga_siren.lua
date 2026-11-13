@@ -81,8 +81,8 @@ nAbilityBuildList,nTalentBuildList,X['sBuyList'],X['sSellList'] = J.SetUserHeroI
 
 X['sSkillList'] = J.Skill.GetSkillList(sAbilityList, nAbilityBuildList, sTalentList, nTalentBuildList)
 
-X['bDeafaultAbility'] = false
-X['bDeafaultItem'] = false
+X['bDefaultAbility'] = false
+X['bDefaultItem'] = false
 
 function X.MinionThink(hMinionUnit)
 

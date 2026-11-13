@@ -19,8 +19,8 @@ if GAMEMODE_ARDM == nil then GAMEMODE_ARDM = 20 end
 
 if BotBuild == nil then return end
 
-local bDeafaultAbilityHero = BotBuild['bDeafaultAbility']
-local bDeafaultItemHero = BotBuild['bDeafaultItem']
+local bDefaultAbilityHero = BotBuild['bDefaultAbility']
+local bDefaultItemHero = BotBuild['bDefaultItem']
 local sAbilityLevelUpList = BotBuild['sSkillList']
 
 local RadiantFountain = Vector(-6619, -6336, 384)
@@ -36,8 +36,8 @@ local function ReloadBotBuild(reason)
 	local ok, newBuild = pcall(dofile, GetScriptDirectory().."/BotLib/"..heroFile)
 	if ok and newBuild ~= nil then
 		BotBuild = newBuild
-		bDeafaultAbilityHero = BotBuild['bDeafaultAbility']
-		bDeafaultItemHero = BotBuild['bDeafaultItem']
+		bDefaultAbilityHero = BotBuild['bDefaultAbility']
+		bDefaultItemHero = BotBuild['bDefaultItem']
 		if newBuild['sSkillList'] ~= nil and #newBuild['sSkillList'] > 0 then
 			local fullList = newBuild['sSkillList']
 
@@ -98,8 +98,8 @@ local function RefreshBotHandle()
 		end
 		if ok and newBuild ~= nil and newBuild['sSkillList'] ~= nil and #newBuild['sSkillList'] > 0 then
 			BotBuild = newBuild
-			bDeafaultAbilityHero = BotBuild['bDeafaultAbility']
-			bDeafaultItemHero = BotBuild['bDeafaultItem']
+			bDefaultAbilityHero = BotBuild['bDefaultAbility']
+			bDefaultItemHero = BotBuild['bDefaultItem']
 			sAbilityLevelUpList = BotBuild['sSkillList']
 			print("[ARDM] Loaded BotLib for "..botName.." with "..#sAbilityLevelUpList.." skill entries, first: "..tostring(sAbilityLevelUpList[1]))
 		else
@@ -108,8 +108,8 @@ local function RefreshBotHandle()
 			print("[ARDM] BotLib load failed or empty for "..botName..", abilities: "..#abilityList..", talents: "..#talentList)
 			if #abilityList > 0 then
 				BotBuild = nil
-				bDeafaultAbilityHero = false
-				bDeafaultItemHero = false
+				bDefaultAbilityHero = false
+				bDefaultItemHero = false
 				sAbilityLevelUpList = J.Utils.CombineTablesUnique(talentList, abilityList)
 				print("[ARDM] Using generic build for "..botName.." with "..#sAbilityLevelUpList.." entries")
 			else
@@ -1275,7 +1275,7 @@ end
 local nLastActiveArmletTime = -90
 X.ConsiderItemDesire["item_armlet"] = function( hItem )
 
-	if bDeafaultItemHero then return BOT_ACTION_DESIRE_NONE end
+	if bDefaultItemHero then return BOT_ACTION_DESIRE_NONE end
 
 	local nCastRange = 1000
 	local sCastType = 'none'
@@ -3885,7 +3885,7 @@ end
 --假腿
 X.ConsiderItemDesire["item_power_treads"] = function( hItem )
 
-	if bDeafaultItemHero then return 0 end
+	if bDefaultItemHero then return 0 end
 
 	local nCastRange = 1000
 	local sCastType = 'none'
@@ -8418,8 +8418,8 @@ function AbilityLevelUpThink()
 end
 
 function X.SetAbilityItemList(heroAbility, items, abilityLvlup)
-	bDeafaultAbilityHero = heroAbility
-	bDeafaultItemHero = items
+	bDefaultAbilityHero = heroAbility
+	bDefaultItemHero = items
 	sAbilityLevelUpList = abilityLvlup
 end
 
