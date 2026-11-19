@@ -111,7 +111,7 @@ local function buildContext()
     -- cache aegis proximity (used twice originally)
     C.aegisNearby1200 = scanDroppedForAegis(1200)
 
-	-- J.Utils.SetCachedVars(cacheKey, C)
+	J.Utils.SetCachedVars(cacheKey, C)
 	return C
 end
 

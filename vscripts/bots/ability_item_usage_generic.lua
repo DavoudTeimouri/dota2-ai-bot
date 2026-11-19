@@ -6,12 +6,12 @@ if not string.find(botName, "hero") then return end
 if not bot.frameProcessTime then bot.frameProcessTime = 0.1 end
 
 local team = GetTeam()
-local bDebugMode = ( 10 == 10 )
+local bDebugMode = ( 10 == 11 )
 
 local J = require( GetScriptDirectory()..'/FunLib/jmz_func' )
 local Utils = require( GetScriptDirectory()..'/FunLib/utils' )
 local EnemyCD = require( GetScriptDirectory()..'/FunLib/aba_enemy_cd' )
-local BotBuild = dofile( GetScriptDirectory().."/BotLib/.."..string.gsub( botName, "npc_dota_hero_", "" ) )
+local BotBuild = dofile( GetScriptDirectory().."/BotLib/"..string.gsub( botName, "npc_dota_hero_", "hero_" )..".lua" )
 local Localization = require( GetScriptDirectory()..'/FunLib/localization' )
 local Customize = require(GetScriptDirectory()..'/Customize/general')
 Customize.ThinkLess = Customize.Enable and Customize.ThinkLess or 1
@@ -230,10 +230,10 @@ local function AbilityLevelUpComplement()
 		if botName == 'npc_dota_hero_kez' then
 			if bot.kez_mode == 'sai' then
 				for i = 0, 6 do
-					local hAbility = bot:GetAbilityInSlot(i)
-					local sAbilityName = hAbility:GetName()
-					if hAbility ~= nil then
-						if sAbilityLevelUpList[1] == 'kez_echo_slash' and sAbilityName == 'kez_falcon_rush'
+										local hAbility = bot:GetAbilityInSlot(i)
+										if hAbility ~= nil then
+											local sAbilityName = hAbility:GetName()
+											if sAbilityLevelUpList[1] == 'kez_echo_slash' and sAbilityName == 'kez_falcon_rush'
 						then
 							abilityToLevelup = hAbility
 							sAbilityLevelUpList[1] = 'kez_falcon_rush'
@@ -254,10 +254,10 @@ local function AbilityLevelUpComplement()
 				end
 			else
 				for i = 0, 6 do
-					local hAbility = bot:GetAbilityInSlot(i)
-					local sAbilityName = hAbility:GetName()
-					if hAbility ~= nil then
-						if sAbilityLevelUpList[1] == 'kez_falcon_rush' and sAbilityName == 'kez_echo_slash'
+										local hAbility = bot:GetAbilityInSlot(i)
+										if hAbility ~= nil then
+											local sAbilityName = hAbility:GetName()
+											if sAbilityLevelUpList[1] == 'kez_falcon_rush' and sAbilityName == 'kez_echo_slash'
 						then
 							abilityToLevelup = hAbility
 							sAbilityLevelUpList[1] = 'kez_echo_slash'

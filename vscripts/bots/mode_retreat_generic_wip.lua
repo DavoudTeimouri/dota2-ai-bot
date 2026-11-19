@@ -189,7 +189,8 @@ function GetDesire()
 		return BOT_ACTION_DESIRE_VERYHIGH
 	end
 
-	local closestEnemy, closestAlly = nEnemyHeroes[1], nAllyHeroes[1]
+	if #nEnemyHeroes > 0 and #nAllyHeroes > 0 then
+	    local closestEnemy, closestAlly = nEnemyHeroes[1], nAllyHeroes[1]
 
 	-- enemy may going for nearby ally. dont retreat.
 	-- if J.IsValidHero(closestEnemy)

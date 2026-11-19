@@ -213,7 +213,7 @@ function X.SkillsComplement()
             if bot.IsMorphling == false and not MorphReplicate:IsHidden() and J.CanCastAbility(MorphReplicate) and MorphedHeroName ~= '' then
                 for i = 0, 6 do
                     local hAbility = bot:GetAbilityInSlot(i)
-                    if hAbility ~= nil and not hAbility ~= MorphReplicate then
+                    if hAbility ~= nil and hAbility ~= MorphReplicate then
                         HandleSpell(hAbility)
                     end
                 end
